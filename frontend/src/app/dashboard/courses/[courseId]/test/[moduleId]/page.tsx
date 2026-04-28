@@ -13,6 +13,7 @@ const QUESTIONS = [
 ];
 
 const PASSING_SCORE = 70;
+const LABELS = ["A", "B", "C", "D"];
 
 export default function TestPage() {
   const params = useParams();
@@ -21,7 +22,8 @@ export default function TestPage() {
   const [submitted, setSubmitted] = useState(false);
 
   const answered = answers.filter(a => a !== null).length;
-  const score = submitted ? Math.round((answers.filter((a, i) => a === QUESTIONS[i].correct).length / QUESTIONS.length) * 100) : 0;
+  const numCorrect = answers.filter((a, i) => a === QUESTIONS[i].correct).length;
+  const score = submitted ? Math.round((numCorrect / QUESTIONS.length) * 100) : 0;
   const passed = score >= PASSING_SCORE;
 
   const handleSubmit = () => {
@@ -29,41 +31,63 @@ export default function TestPage() {
     setSubmitted(true);
   };
 
+  /* ── Results screen ── */
   if (submitted) {
     return (
-      <div className="p-6 max-w-2xl mx-auto space-y-5">
-        <Link href={`/dashboard/courses/${params.courseId}`} className="flex items-center gap-2 text-white/50 hover:text-white text-sm transition-colors">
+      <div style={{ padding: "28px 24px", maxWidth: "680px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "20px" }}>
+
+        <Link href={`/dashboard/courses/${params.courseId}`} style={{ display: "inline-flex", alignItems: "center", gap: "8px", color: "rgba(255,255,255,0.50)", textDecoration: "none", fontSize: "14px", fontWeight: 600, width: "fit-content" }}>
           <ArrowLeft size={16} /> Back to Course
         </Link>
 
         {/* Score card */}
-        <div className={`glass-card p-8 text-center border ${passed ? "border-green-500/20" : "border-red-500/20"}`}>
-          {passed ? <Trophy size={48} className="text-amber-400 mx-auto mb-4" /> : <XCircle size={48} className="text-red-400 mx-auto mb-4" />}
-          <p className="text-6xl font-black gradient-text mb-2">{score}%</p>
-          <p className={`text-xl font-bold mb-2 ${passed ? "text-green-400" : "text-red-400"}`}>{passed ? "Passed!" : "Not Passed"}</p>
-          <p className="text-white/50 text-sm mb-4">{answers.filter((a, i) => a === QUESTIONS[i].correct).length} / {QUESTIONS.length} correct · Passing score: {PASSING_SCORE}%</p>
-          {passed && <span className="badge-green">Certificate Earned!</span>}
-          <div className="flex flex-wrap gap-3 justify-center mt-6">
-            <Link href={`/dashboard/courses/${params.courseId}`} className="btn-secondary px-5 py-2.5 text-sm">Back to Course</Link>
-            {passed && <Link href="/dashboard/certificates" className="btn-primary px-5 py-2.5 text-sm">View Certificate</Link>}
-            {!passed && <button onClick={() => { setSubmitted(false); setAnswers(QUESTIONS.map(() => null)); setCurrent(0); }} className="btn-primary px-5 py-2.5 text-sm">Try Again</button>}
+        <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${passed ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}`, borderRadius: "20px", padding: "40px 32px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+          {passed
+            ? <Trophy size={52} style={{ color: "#FBBF24" }} />
+            : <XCircle size={52} style={{ color: "#F87171" }} />}
+          <p style={{ fontSize: "64px", fontWeight: 900, margin: 0, background: "linear-gradient(135deg,#A78BFA,#22D3EE)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{score}%</p>
+          <p style={{ fontSize: "22px", fontWeight: 700, color: passed ? "#34D399" : "#F87171", margin: 0 }}>{passed ? "Passed!" : "Not Passed"}</p>
+          <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.45)", margin: 0 }}>{numCorrect} / {QUESTIONS.length} correct &middot; Passing: {PASSING_SCORE}%</p>
+          {passed && (
+            <span style={{ padding: "4px 14px", borderRadius: "20px", background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)", color: "#34D399", fontSize: "13px", fontWeight: 700 }}>
+              Certificate Earned!
+            </span>
+          )}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "center", marginTop: "8px" }}>
+            <Link href={`/dashboard/courses/${params.courseId}`} style={{ display: "inline-flex", alignItems: "center", padding: "10px 24px", borderRadius: "12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "14px", fontWeight: 600, textDecoration: "none" }}>
+              Back to Course
+            </Link>
+            {passed && (
+              <Link href="/dashboard/certificates" style={{ display: "inline-flex", alignItems: "center", padding: "10px 24px", borderRadius: "12px", background: "linear-gradient(135deg,#7C3AED,#0891B2)", color: "#fff", fontSize: "14px", fontWeight: 700, textDecoration: "none" }}>
+                View Certificate
+              </Link>
+            )}
+            {!passed && (
+              <button onClick={() => { setSubmitted(false); setAnswers(QUESTIONS.map(() => null)); setCurrent(0); }} style={{ display: "inline-flex", alignItems: "center", padding: "10px 24px", borderRadius: "12px", background: "linear-gradient(135deg,#7C3AED,#0891B2)", color: "#fff", fontSize: "14px", fontWeight: 700, border: "none", cursor: "pointer" }}>
+                Try Again
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Review */}
-        <div className="space-y-3">
+        {/* Question review */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           {QUESTIONS.map((q, i) => {
             const isCorrect = answers[i] === q.correct;
             return (
-              <div key={i} className={`glass-card p-4 border ${isCorrect ? "border-green-500/15" : "border-red-500/15"}`}>
-                <div className="flex items-start gap-3">
-                  {isCorrect ? <CheckCircle size={16} className="text-green-400 mt-0.5 flex-shrink-0" /> : <XCircle size={16} className="text-red-400 mt-0.5 flex-shrink-0" />}
-                  <div>
-                    <p className="text-sm text-white font-medium mb-2">Q{i + 1}. {q.q}</p>
-                    <p className="text-xs text-green-400 mb-1">✓ {q.opts[q.correct]}</p>
-                    {!isCorrect && answers[i] !== null && <p className="text-xs text-red-400 mb-1">✗ {q.opts[answers[i]!]}</p>}
-                    <p className="text-xs text-white/40">{q.exp}</p>
-                  </div>
+              <div key={i} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${isCorrect ? "rgba(16,185,129,0.20)" : "rgba(239,68,68,0.20)"}`, borderRadius: "14px", padding: "18px 20px", display: "flex", gap: "14px" }}>
+                <div style={{ flexShrink: 0, marginTop: "2px" }}>
+                  {isCorrect
+                    ? <CheckCircle size={18} style={{ color: "#34D399" }} />
+                    : <XCircle    size={18} style={{ color: "#F87171" }} />}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ color: "#fff", fontWeight: 600, fontSize: "14px", margin: "0 0 8px" }}>Q{i + 1}. {q.q}</p>
+                  <p style={{ color: "#34D399", fontSize: "13px", margin: "0 0 4px" }}>&#10003; {q.opts[q.correct]}</p>
+                  {!isCorrect && answers[i] !== null && (
+                    <p style={{ color: "#F87171", fontSize: "13px", margin: "0 0 4px" }}>&#10007; {q.opts[answers[i]!]}</p>
+                  )}
+                  <p style={{ color: "rgba(255,255,255,0.40)", fontSize: "12px", margin: "6px 0 0", lineHeight: "1.5" }}>{q.exp}</p>
                 </div>
               </div>
             );
@@ -73,76 +97,135 @@ export default function TestPage() {
     );
   }
 
+  /* ── Quiz screen ── */
+  const q = QUESTIONS[current];
+
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-5">
+    <div style={{ padding: "28px 24px", maxWidth: "680px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "20px" }}>
+
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href={`/dashboard/courses/${params.courseId}`} className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors">
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <Link href={`/dashboard/courses/${params.courseId}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "36px", height: "36px", borderRadius: "10px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.60)", textDecoration: "none", flexShrink: 0 }}>
           <ArrowLeft size={18} />
         </Link>
         <div>
-          <p className="text-xs text-white/40">Module Test</p>
-          <h1 className="font-bold text-white">Linear Regression</h1>
+          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", margin: 0, textTransform: "uppercase", letterSpacing: "0.08em" }}>Module Test</p>
+          <h1 style={{ fontSize: "18px", fontWeight: 800, color: "#fff", margin: 0 }}>Linear Regression</h1>
         </div>
       </div>
 
-      {/* Progress */}
-      <div className="glass-card p-4 flex items-center gap-4">
-        <div className="text-center">
-          <p className="text-2xl font-bold text-white">{current + 1}</p>
-          <p className="text-xs text-white/40">of {QUESTIONS.length}</p>
+      {/* Progress bar */}
+      <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "16px 20px", display: "flex", alignItems: "center", gap: "18px" }}>
+        <div style={{ textAlign: "center", flexShrink: 0 }}>
+          <p style={{ fontSize: "28px", fontWeight: 900, color: "#fff", margin: 0, lineHeight: 1 }}>{current + 1}</p>
+          <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", margin: "3px 0 0" }}>of {QUESTIONS.length}</p>
         </div>
-        <div className="flex-1">
-          <div className="flex justify-between text-xs text-white/50 mb-1"><span>Answered: {answered}/{QUESTIONS.length}</span></div>
-          <div className="h-2 rounded-full bg-white/[0.06]">
-            <div className="h-full rounded-full transition-all" style={{ width: `${(answered / QUESTIONS.length) * 100}%`, background: "linear-gradient(90deg, #7C3AED, #22D3EE)" }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)" }}>Answered: {answered}/{QUESTIONS.length}</span>
+            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)" }}>{Math.round((answered / QUESTIONS.length) * 100)}%</span>
+          </div>
+          <div style={{ height: "8px", borderRadius: "99px", background: "rgba(255,255,255,0.07)" }}>
+            <div style={{ height: "100%", borderRadius: "99px", width: `${(answered / QUESTIONS.length) * 100}%`, background: "linear-gradient(90deg, #7C3AED, #22D3EE)", transition: "width .3s" }} />
           </div>
         </div>
       </div>
 
-      {/* Question */}
-      <div className="glass-card p-6 space-y-4">
-        <div className="flex items-start gap-3">
-          <span className="badge-purple flex-shrink-0">Q{current + 1}</span>
-          <p className="text-white font-medium leading-relaxed">{QUESTIONS[current].q}</p>
+      {/* Question card */}
+      <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
+        {/* Question text */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "20px" }}>
+          <span style={{ padding: "4px 12px", borderRadius: "20px", background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.35)", color: "#A78BFA", fontSize: "12px", fontWeight: 700, flexShrink: 0, marginTop: "2px" }}>
+            Q{current + 1}
+          </span>
+          <p style={{ color: "#fff", fontWeight: 600, fontSize: "16px", margin: 0, lineHeight: "1.5" }}>{q.q}</p>
         </div>
-        <div className="space-y-2">
-          {QUESTIONS[current].opts.map((opt, i) => (
-            <button
-              key={i}
-              onClick={() => setAnswers(a => { const n = [...a]; n[current] = i; return n; })}
-              className={`w-full text-left px-4 py-3 rounded-xl text-sm border transition-all ${answers[current] === i ? "border-purple-500/60 bg-purple-500/10 text-purple-300" : "border-white/[0.08] text-white/70 hover:border-white/20 hover:bg-white/[0.04]"}`}
-            >
-              <span className="font-bold mr-3 text-white/40">{["A", "B", "C", "D"][i]}.</span>{opt}
-            </button>
-          ))}
+
+        {/* Options */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {q.opts.map((opt, i) => {
+            const isSelected = answers[current] === i;
+            return (
+              <button
+                key={i}
+                onClick={() => setAnswers(a => { const n = [...a]; n[current] = i; return n; })}
+                style={{
+                  display: "flex", alignItems: "center", gap: "14px",
+                  width: "100%", textAlign: "left", padding: "14px 18px",
+                  borderRadius: "12px", fontSize: "14px", cursor: "pointer",
+                  background: isSelected ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.02)",
+                  border: `1px solid ${isSelected ? "rgba(124,58,237,0.50)" : "rgba(255,255,255,0.08)"}`,
+                  color: isSelected ? "#C4B5FD" : "rgba(255,255,255,0.70)",
+                  outline: "none", transition: "all .15s",
+                }}
+              >
+                <span style={{ width: "28px", height: "28px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: "13px", fontWeight: 700, background: isSelected ? "rgba(124,58,237,0.25)" : "rgba(255,255,255,0.06)", color: isSelected ? "#A78BFA" : "rgba(255,255,255,0.40)" }}>
+                  {LABELS[i]}
+                </span>
+                {opt}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Nav */}
+      {/* Warning: unanswered on last page */}
       {answered < QUESTIONS.length && current === QUESTIONS.length - 1 && (
-        <div className="glass-card p-4 flex items-center gap-3 border border-amber-500/20 bg-amber-500/5">
-          <AlertCircle size={16} className="text-amber-400 flex-shrink-0" />
-          <p className="text-sm text-amber-400">{QUESTIONS.length - answered} question{QUESTIONS.length - answered !== 1 ? "s" : ""} unanswered.</p>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 18px", borderRadius: "12px", background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.25)" }}>
+          <AlertCircle size={16} style={{ color: "#FBBF24", flexShrink: 0 }} />
+          <p style={{ color: "#FBBF24", fontSize: "13px", margin: 0 }}>
+            {QUESTIONS.length - answered} question{QUESTIONS.length - answered !== 1 ? "s" : ""} still unanswered.
+          </p>
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <button onClick={() => setCurrent(c => Math.max(0, c - 1))} disabled={current === 0} className="btn-secondary px-5 py-2.5 text-sm disabled:opacity-40">Previous</button>
-        <div className="flex gap-1.5">
+      {/* Navigation */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+        <button
+          onClick={() => setCurrent(c => Math.max(0, c - 1))}
+          disabled={current === 0}
+          style={{ padding: "10px 22px", borderRadius: "12px", fontSize: "14px", fontWeight: 600, cursor: current === 0 ? "default" : "pointer", opacity: current === 0 ? 0.35 : 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}
+        >
+          Previous
+        </button>
+
+        {/* Question dots */}
+        <div style={{ display: "flex", gap: "8px" }}>
           {QUESTIONS.map((_, i) => (
-            <button key={i} onClick={() => setCurrent(i)}
-              className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${i === current ? "bg-purple-600 text-white" : answers[i] !== null ? "bg-green-500/20 text-green-400" : "bg-white/[0.06] text-white/40"}`}>
+            <button
+              key={i}
+              onClick={() => setCurrent(i)}
+              style={{ width: "34px", height: "34px", borderRadius: "10px", fontSize: "13px", fontWeight: 700, cursor: "pointer", border: "none", outline: "none", transition: "all .15s",
+                background: i === current ? "linear-gradient(135deg,#7C3AED,#0891B2)" : answers[i] !== null ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.07)",
+                color: i === current ? "#fff" : answers[i] !== null ? "#34D399" : "rgba(255,255,255,0.45)",
+              }}
+            >
               {i + 1}
             </button>
           ))}
         </div>
+
         {current < QUESTIONS.length - 1 ? (
-          <button onClick={() => setCurrent(c => c + 1)} className="btn-primary px-5 py-2.5 text-sm">Next</button>
+          <button
+            onClick={() => setCurrent(c => c + 1)}
+            style={{ padding: "10px 22px", borderRadius: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer", background: "linear-gradient(135deg,#7C3AED,#0891B2)", border: "none", color: "#fff" }}
+          >
+            Next
+          </button>
         ) : answered === QUESTIONS.length ? (
-          <button onClick={handleSubmit} className="btn-primary px-5 py-2.5 text-sm">Submit</button>
+          <button
+            onClick={handleSubmit}
+            style={{ padding: "10px 22px", borderRadius: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer", background: "linear-gradient(135deg,#7C3AED,#0891B2)", border: "none", color: "#fff" }}
+          >
+            Submit
+          </button>
         ) : (
-          <button disabled className="btn-primary px-5 py-2.5 text-sm opacity-40">Submit</button>
+          <button
+            disabled
+            style={{ padding: "10px 22px", borderRadius: "12px", fontSize: "14px", fontWeight: 700, cursor: "default", opacity: 0.35, background: "linear-gradient(135deg,#7C3AED,#0891B2)", border: "none", color: "#fff" }}
+          >
+            Submit
+          </button>
         )}
       </div>
     </div>

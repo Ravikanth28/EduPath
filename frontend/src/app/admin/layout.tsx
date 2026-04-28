@@ -63,9 +63,9 @@ function SidebarContent({ pathname, onNavClick, onLogout, adminName }: { pathnam
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [adminName, setAdminName]   = useState("");
-  const [ready, setReady]           = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [adminName, setAdminName]     = useState("");
+  const [ready, setReady]             = useState(false);
   const pathname = usePathname();
   const router   = useRouter();
 
@@ -91,22 +91,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#050508" }}>
 
-      <div style={{ width: "240px", flexShrink: 0, display: "flex", flexDirection: "column" }}>
-        <SidebarContent pathname={pathname} onNavClick={() => {}} onLogout={handleLogout} adminName={adminName} />
-      </div>
-
-      {mobileOpen && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex" }}>
-          <div style={{ width: "240px", flexShrink: 0, display: "flex", flexDirection: "column" }}>
-            <SidebarContent pathname={pathname} onNavClick={() => setMobileOpen(false)} onLogout={handleLogout} adminName={adminName} />
-          </div>
-          <div style={{ flex: 1, background: "rgba(0,0,0,0.65)" }} onClick={() => setMobileOpen(false)} />
+      {/* Desktop sidebar — toggled by Menu button */}
+      <div style={{
+        width: sidebarOpen ? "240px" : "0px",
+        flexShrink: 0,
+        overflow: "hidden",
+        transition: "width 0.25s ease",
+        display: "flex",
+        flexDirection: "column",
+      }}>
+        <div style={{ width: "240px", height: "100%" }}>
+          <SidebarContent pathname={pathname} onNavClick={() => {}} onLogout={handleLogout} adminName={adminName} />
         </div>
-      )}
+      </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
         <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#0A0A12", display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
-          <button onClick={() => setMobileOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.6)", padding: "6px", display: "flex", borderRadius: "8px" }}>
+          <button onClick={() => setSidebarOpen(o => !o)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.6)", padding: "6px", display: "flex", borderRadius: "8px" }}>
             <Menu size={18} />
           </button>
           <div style={{ width: "1px", height: "18px", background: "rgba(255,255,255,0.1)" }} />
