@@ -47,7 +47,7 @@ export default function StudentDetailPage() {
         </Link>
         <div className="flex-1 min-w-0">
           <h1 className="font-bold text-white text-lg">{STUDENT.name}</h1>
-          <p className="text-xs text-white/40">{STUDENT.phone} · {STUDENT.email}</p>
+          <p className="text-xs text-white/40">{STUDENT.phone} - {STUDENT.email}</p>
         </div>
         <button onClick={() => editing ? handleSave() : setEditing(true)} className={editing ? "btn-primary flex items-center gap-2 px-4 py-2 text-sm" : "btn-secondary flex items-center gap-2 px-4 py-2 text-sm"}>
           {editing ? <><Save size={14} /> Save</> : <><Edit2 size={14} /> Edit</>}
@@ -76,7 +76,7 @@ export default function StudentDetailPage() {
 
       {/* Edit form */}
       {editing && (
-        <div className="glass-card p-5 space-y-4 gradient-border">
+        <div className="glass-card p-5 space-y-4 red-border">
           <h3 className="font-semibold text-white text-sm">Edit Student Info</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[["Full Name", "name", "text"], ["Phone Number", "phone", "tel"], ["Email", "email", "email"], ["New Password", "password", "password"]].map(([label, key, type]) => (
@@ -101,7 +101,7 @@ export default function StudentDetailPage() {
                 <CheckCircle size={16} className="text-green-400 flex-shrink-0" />
                 <div className="flex-1">
                   <p className="text-sm text-white">{cert.course}</p>
-                  <p className="text-xs text-white/40">{cert.id} · Issued {cert.issued}</p>
+                  <p className="text-xs text-white/40">{cert.id} - Issued {cert.issued}</p>
                 </div>
                 <span className={`text-xs px-2 py-1 rounded-full ${cert.status === "verified" ? "badge-green" : "badge-amber"}`}>{cert.status}</span>
                 <Link href={`/admin/certificates`} className="text-xs text-purple-400 hover:text-purple-300">Manage</Link>
@@ -127,7 +127,7 @@ export default function StudentDetailPage() {
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <div className="w-20 h-1.5 rounded-full bg-white/10">
-                    <div className="h-full rounded-full bg-gradient-to-r from-purple-600 to-cyan-500" style={{ width: `${en.progress}%` }} />
+                    <div className="h-full rounded-full bg-red-500" style={{ width: `${en.progress}%` }} />
                   </div>
                   <span className="text-xs text-white/60">{en.progress}%</span>
                 </div>
@@ -153,13 +153,13 @@ export default function StudentDetailPage() {
                             <span className="text-xs text-white/60">{mod.videosDone}/{mod.videosTotal}</span>
                           </td>
                           <td className="py-3 text-center">
-                            {mod.testDone ? <CheckCircle size={14} className="text-green-400 mx-auto" /> : <span className="text-xs text-white/30">—</span>}
+                            {mod.testDone ? <CheckCircle size={14} className="text-green-400 mx-auto" /> : <span className="text-xs text-white/30">-</span>}
                           </td>
                           <td className="py-3 text-center">
                             {mod.testScore !== null ? (
                               <span className={`text-xs font-bold ${mod.testScore >= 70 ? "text-green-400" : "text-red-400"}`}>{mod.testScore}%</span>
                             ) : (
-                              <span className="text-xs text-white/30">—</span>
+                              <span className="text-xs text-white/30">-</span>
                             )}
                           </td>
                         </tr>

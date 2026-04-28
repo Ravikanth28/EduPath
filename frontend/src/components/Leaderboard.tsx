@@ -81,7 +81,7 @@ export function Leaderboard({ showMyRank = false }: LeaderboardProps) {
         <div className="flex items-end justify-center gap-4">
           {/* Rank 2 */}
           <div className="flex flex-col items-center gap-2">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center text-white font-bold text-xl">
+            <div className="w-14 h-14 rounded-full bg-zinc-600 flex items-center justify-center text-white font-bold text-xl">
               {top3[1]?.name[0]}
             </div>
             <p className="text-xs text-white/70 text-center max-w-[80px] truncate">{top3[1]?.name}</p>
@@ -89,7 +89,7 @@ export function Leaderboard({ showMyRank = false }: LeaderboardProps) {
               <Zap size={12} className="text-yellow-400" />
               {top3[1]?.points}
             </div>
-            <div className="w-20 bg-gradient-to-t from-slate-600 to-slate-500 rounded-t-lg flex flex-col items-center justify-start pt-3 h-20">
+            <div className="w-20 bg-zinc-600 rounded-t-lg flex flex-col items-center justify-start pt-3 h-20">
               <Medal size={20} className="text-slate-300" />
               <span className="text-slate-300 font-bold text-lg">2</span>
             </div>
@@ -97,7 +97,7 @@ export function Leaderboard({ showMyRank = false }: LeaderboardProps) {
           {/* Rank 1 */}
           <div className="flex flex-col items-center gap-2">
             <Crown size={20} className="text-yellow-400" />
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold text-2xl">
+            <div className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-2xl">
               {top3[0]?.name[0]}
             </div>
             <p className="text-xs text-white font-semibold text-center max-w-[80px] truncate">{top3[0]?.name}</p>
@@ -105,14 +105,14 @@ export function Leaderboard({ showMyRank = false }: LeaderboardProps) {
               <Zap size={12} />
               {top3[0]?.points}
             </div>
-            <div className="w-20 bg-gradient-to-t from-yellow-600 to-yellow-500 rounded-t-lg flex flex-col items-center justify-start pt-3 h-28">
+            <div className="w-20 bg-red-600 rounded-t-lg flex flex-col items-center justify-start pt-3 h-28">
               <Trophy size={20} className="text-yellow-200" />
               <span className="text-yellow-200 font-bold text-lg">1</span>
             </div>
           </div>
           {/* Rank 3 */}
           <div className="flex flex-col items-center gap-2">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 flex items-center justify-center text-white font-bold text-xl">
+            <div className="w-14 h-14 rounded-full bg-zinc-700 flex items-center justify-center text-white font-bold text-xl">
               {top3[2]?.name[0]}
             </div>
             <p className="text-xs text-white/70 text-center max-w-[80px] truncate">{top3[2]?.name}</p>
@@ -120,7 +120,7 @@ export function Leaderboard({ showMyRank = false }: LeaderboardProps) {
               <Zap size={12} className="text-amber-400" />
               {top3[2]?.points}
             </div>
-            <div className="w-20 bg-gradient-to-t from-amber-800 to-amber-700 rounded-t-lg flex flex-col items-center justify-start pt-3 h-14">
+            <div className="w-20 bg-zinc-700 rounded-t-lg flex flex-col items-center justify-start pt-3 h-14">
               <Medal size={20} className="text-amber-400" />
               <span className="text-amber-300 font-bold text-lg">3</span>
             </div>
@@ -140,7 +140,7 @@ export function Leaderboard({ showMyRank = false }: LeaderboardProps) {
             <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm font-bold text-white/60">
               {entry.rank}
             </div>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+            <div className="w-9 h-9 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
               {entry.name[0]}
             </div>
             <div className="flex-1 min-w-0">
@@ -162,7 +162,7 @@ export function Leaderboard({ showMyRank = false }: LeaderboardProps) {
           <div className="w-8 h-8 rounded-lg bg-purple-600/20 flex items-center justify-center text-sm font-bold text-purple-400">
             {currentUser.rank}
           </div>
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center text-white font-bold text-sm">
+          <div className="w-9 h-9 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-sm">
             Y
           </div>
           <div className="flex-1">

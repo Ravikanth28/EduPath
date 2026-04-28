@@ -25,15 +25,15 @@ export default function VerifyPage({ params }: { params: { code: string } }) {
   }, [params.code]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative" style={{ background: "#050508" }}>
+    <div className="min-h-screen flex items-center justify-center px-4 relative" style={{ background: "linear-gradient(135deg,#14218C 0%,#243AD1 45%,#5368F0 100%)" }}>
       <div className="absolute inset-0 grid-pattern opacity-40 pointer-events-none" />
-      <div className="absolute top-0 left-1/3 w-80 h-80 rounded-full opacity-10 blur-3xl pointer-events-none" style={{ background: "radial-gradient(circle, #7C3AED, transparent)" }} />
+      <div className="absolute top-0 left-1/3 w-80 h-80 rounded-full opacity-10 blur-3xl pointer-events-none" style={{ background: "transparent" }} />
 
       <div className="relative z-10 w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#7C3AED,#06B6D4)" }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#2F45D8,#2336B8)" }}>
               <GraduationCap size={18} className="text-white" />
             </div>
             <span className="font-bold text-white">EduPath</span>

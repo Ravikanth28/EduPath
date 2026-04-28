@@ -35,8 +35,8 @@ export function CertificateCard({
       <div
         className="relative overflow-hidden rounded-2xl select-none"
         style={{
-          background: "linear-gradient(135deg, #050520 0%, #0A0A30 50%, #050520 100%)",
-          border: "2px solid rgba(212,175,55,0.3)",
+          background: "linear-gradient(180deg,rgba(238,243,255,0.98),rgba(225,232,255,0.94))",
+          border: "2px solid rgba(47,69,216,0.3)",
         }}
       >
         {/* Corner ornaments */}
@@ -66,7 +66,7 @@ export function CertificateCard({
           <p className="text-sm text-white/60">has successfully completed the course</p>
 
           {/* Course name */}
-          <div className="inline-block px-6 py-2 rounded-full border border-amber-400/40" style={{ background: "rgba(212,175,55,0.08)" }}>
+          <div className="inline-block px-6 py-2 rounded-full border border-amber-400/40" style={{ background: "rgba(47,69,216,0.08)" }}>
             <span className="text-amber-300 font-semibold text-lg">{courseName}</span>
           </div>
 
@@ -96,7 +96,7 @@ export function CertificateCard({
 
         {/* Status footer */}
         {status === "verified" && (
-          <div className="px-6 py-3 flex items-center gap-2 justify-center" style={{ background: "rgba(34,197,94,0.08)", borderTop: "1px solid rgba(34,197,94,0.2)" }}>
+          <div className="px-6 py-3 flex items-center gap-2 justify-center" style={{ background: "rgba(106,112,133,0.08)", borderTop: "1px solid rgba(106,112,133,0.2)" }}>
             <CheckCircle size={14} className="text-green-400" />
             <span className="text-xs text-green-400 font-semibold">Verified Certificate</span>
             {verifyUrl && (
@@ -107,13 +107,13 @@ export function CertificateCard({
           </div>
         )}
         {status === "pending" && (
-          <div className="px-6 py-3 flex items-center gap-2 justify-center" style={{ background: "rgba(245,158,11,0.08)", borderTop: "1px solid rgba(245,158,11,0.2)" }}>
+          <div className="px-6 py-3 flex items-center gap-2 justify-center" style={{ background: "rgba(106,112,133,0.08)", borderTop: "1px solid rgba(106,112,133,0.2)" }}>
             <Clock size={14} className="text-amber-400" />
             <span className="text-xs text-amber-400 font-semibold">Pending Admin Verification</span>
           </div>
         )}
         {status === "revoked" && (
-          <div className="px-6 py-3 flex items-center gap-2 justify-center" style={{ background: "rgba(239,68,68,0.08)", borderTop: "1px solid rgba(239,68,68,0.2)" }}>
+          <div className="px-6 py-3 flex items-center gap-2 justify-center" style={{ background: "rgba(47,69,216,0.08)", borderTop: "1px solid rgba(47,69,216,0.2)" }}>
             <XCircle size={14} className="text-red-400" />
             <span className="text-xs text-red-400 font-semibold">Revoked{revokeReason ? `: ${revokeReason}` : ""}</span>
           </div>

@@ -47,7 +47,7 @@ export default function NewCoursePage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="glass-card p-6 space-y-5 gradient-border">
+        <div className="glass-card p-6 space-y-5 red-border">
           {/* Title */}
           <div>
             <label className="text-xs text-white/50 uppercase tracking-wider mb-1.5 block">Course Title *</label>
@@ -98,7 +98,7 @@ export default function NewCoursePage() {
               <button type="button" onClick={() => handleModuleCount(-1)} disabled={moduleCount <= 1} className="w-10 h-10 rounded-xl border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-purple-600/40 transition-all disabled:opacity-30">
                 <Minus size={16} />
               </button>
-              <span className="text-4xl font-black gradient-text w-12 text-center">{moduleCount}</span>
+              <span className="text-4xl font-black text-red-400 w-12 text-center">{moduleCount}</span>
               <button type="button" onClick={() => handleModuleCount(1)} disabled={moduleCount >= 20} className="w-10 h-10 rounded-xl border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-purple-600/40 transition-all disabled:opacity-30">
                 <Plus size={16} />
               </button>

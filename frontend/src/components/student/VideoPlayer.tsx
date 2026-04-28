@@ -61,7 +61,7 @@ export function VideoPlayer({ videoId, title, onComplete, checkpoints = [] }: Vi
 
         {/* Checkpoint overlay */}
         {checkpoint && (
-          <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: "rgba(5,5,8,0.92)", backdropFilter: "blur(6px)" }}>
+          <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: "rgba(17,19,34,0.92)", backdropFilter: "blur(6px)" }}>
             <div className="glass-card p-6 max-w-md w-full mx-4 space-y-4">
               <div className="flex items-center gap-2">
                 <span className="badge-purple text-xs">Checkpoint Question</span>

@@ -173,6 +173,11 @@ export const api = {
     delete: (id: string) => request<void>(`/courses/${id}`, { method: "DELETE" }),
     enroll: (id: string) =>
       request<{ message: string }>(`/courses/${id}/enroll`, { method: "POST" }),
+    completeModule: (courseId: string, moduleNum: number) =>
+      request<{ message: string; progress: number; completed_modules: number; completed: boolean }>(
+        `/courses/${courseId}/modules/${moduleNum}/complete`,
+        { method: "POST" }
+      ),
   },
 
   /** Students (admin) */

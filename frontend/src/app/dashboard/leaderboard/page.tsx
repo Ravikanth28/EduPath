@@ -15,7 +15,7 @@ export default function LeaderboardPage() {
       <div className="text-center">
         <div className="flex items-center justify-center gap-3 mb-2">
           <Trophy size={28} className="text-amber-400" />
-          <h1 className="text-3xl font-bold gradient-text">Leaderboard</h1>
+          <h1 className="text-3xl font-bold text-red-400">Leaderboard</h1>
         </div>
         <p className="text-white/50 text-sm">Earn points, climb the ranks, and win monthly prizes.</p>
       </div>

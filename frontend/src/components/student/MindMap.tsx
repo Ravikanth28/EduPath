@@ -24,8 +24,8 @@ export function MindMap({ title, topics }: MindMapProps) {
       position: { x: centerX - 60, y: centerY - 25 },
       data: { label: title },
       style: {
-        background: "linear-gradient(135deg, #7C3AED, #06B6D4)",
-        color: "#fff",
+        background: "linear-gradient(135deg,#2F45D8,#2336B8)",
+        color: "#111322",
         border: "none",
         borderRadius: "12px",
         fontWeight: "bold",
@@ -45,9 +45,9 @@ export function MindMap({ title, topics }: MindMapProps) {
         },
         data: { label: topic },
         style: {
-          background: "rgba(255,255,255,0.05)",
-          color: "#A78BFA",
-          border: "1px solid rgba(124,58,237,0.3)",
+          background: "rgba(17,19,34,0.05)",
+          color: "#2F45D8",
+          border: "1px solid rgba(47,69,216,0.3)",
           borderRadius: "10px",
           fontSize: "12px",
           padding: "8px 14px",
@@ -62,14 +62,14 @@ export function MindMap({ title, topics }: MindMapProps) {
     id: `e-center-${i}`,
     source: "center",
     target: `topic-${i}`,
-    style: { stroke: "rgba(124,58,237,0.4)", strokeWidth: 1.5 },
+    style: { stroke: "rgba(47,69,216,0.4)", strokeWidth: 1.5 },
     animated: false,
   }));
 
   return (
     <div className="glass-card overflow-hidden" style={{ height: "500px" }}>
       <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
-        <span className="text-sm font-semibold text-white">{title} — Mind Map</span>
+        <span className="text-sm font-semibold text-white">{title} - Mind Map</span>
       </div>
       <div style={{ height: "calc(100% - 49px)" }}>
         <ReactFlow
@@ -79,9 +79,9 @@ export function MindMap({ title, topics }: MindMapProps) {
           proOptions={{ hideAttribution: true }}
           style={{ background: "transparent" }}
         >
-          <Background color="rgba(124,58,237,0.1)" gap={24} size={1} />
-          <Controls style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px" }} />
-          <MiniMap style={{ background: "rgba(5,5,8,0.8)", border: "1px solid rgba(255,255,255,0.06)" }} />
+          <Background color="rgba(47,69,216,0.1)" gap={24} size={1} />
+          <Controls style={{ background: "rgba(17,19,34,0.04)", border: "1px solid rgba(17,19,34,0.08)", borderRadius: "8px" }} />
+          <MiniMap style={{ background: "rgba(17,19,34,0.8)", border: "1px solid rgba(17,19,34,0.06)" }} />
         </ReactFlow>
       </div>
     </div>
