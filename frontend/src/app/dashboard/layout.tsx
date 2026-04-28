@@ -1,8 +1,9 @@
 ﻿"use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { GraduationCap, LayoutDashboard, BookOpen, Award, User, LogOut, ChevronRight, Menu, X } from "lucide-react";
+import { api, clearToken, getToken } from "../../lib/api";
 
 const NAV_LINKS = [
   { href: "/dashboard",              label: "Dashboard",    icon: LayoutDashboard },
@@ -11,7 +12,7 @@ const NAV_LINKS = [
   { href: "/dashboard/profile",      label: "My Profile",   icon: User },
 ];
 
-function SidebarContent({ pathname, onNav }: { pathname: string; onNav: () => void }) {
+function SidebarContent({ pathname, onNavClick, onLogout, userName, userEmail }: { pathname: string; onNavClick: () => void; onLogout: () => void; userName: string; userEmail: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#0A0A12", borderRight: "1px solid rgba(255,255,255,0.06)" }}>
       {/* Brand */}
@@ -30,7 +31,7 @@ function SidebarContent({ pathname, onNav }: { pathname: string; onNav: () => vo
         {NAV_LINKS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
           return (
-            <Link key={href} href={href} onClick={onNav} style={{
+            <Link key={href} href={href} onClick={onNavClick} style={{
               display: "flex", alignItems: "center", gap: "12px",
               padding: "10px 12px", borderRadius: "10px", textDecoration: "none",
               fontSize: "14px", fontWeight: 600, transition: "all .15s",
@@ -49,15 +50,15 @@ function SidebarContent({ pathname, onNav }: { pathname: string; onNav: () => vo
       {/* User footer */}
       <div style={{ padding: "14px", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", marginBottom: "6px" }}>
-          <div style={{ width: "34px", height: "34px", borderRadius: "50%", background: "linear-gradient(135deg,#7C3AED,#06B6D4)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: "13px", flexShrink: 0 }}>S</div>
+          <div style={{ width: "34px", height: "34px", borderRadius: "50%", background: "linear-gradient(135deg,#7C3AED,#06B6D4)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: "13px", flexShrink: 0 }}>{userName.charAt(0).toUpperCase()}</div>
           <div style={{ minWidth: 0 }}>
-            <p style={{ fontSize: "13px", fontWeight: 700, color: "#fff", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Student</p>
-            <p style={{ fontSize: "10px", color: "#A78BFA", margin: 0, fontWeight: 600 }}>Student</p>
+            <p style={{ fontSize: "13px", fontWeight: 700, color: "#fff", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</p>
+            <p style={{ fontSize: "10px", color: "#A78BFA", margin: 0, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userEmail}</p>
           </div>
         </div>
-        <Link href="/login" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "9px 12px", borderRadius: "10px", textDecoration: "none", fontSize: "13px", color: "rgba(255,255,255,0.45)", fontWeight: 600 }}>
+        <button onClick={onLogout} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "9px 12px", borderRadius: "10px", textDecoration: "none", fontSize: "13px", color: "rgba(255,255,255,0.45)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", width: "100%" }}>
           <LogOut size={15} /> Sign Out
-        </Link>
+        </button>
       </div>
     </div>
   );
@@ -65,21 +66,45 @@ function SidebarContent({ pathname, onNav }: { pathname: string; onNav: () => vo
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userName, setUserName]     = useState("");
+  const [userEmail, setUserEmail]   = useState("");
+  const [ready, setReady]           = useState(false);
   const pathname = usePathname();
+  const router   = useRouter();
+
+  useEffect(() => {
+    if (!getToken()) { router.replace("/login"); return; }
+    api.profile.get()
+      .then(u => {
+        if (u.role === "admin") { router.replace("/admin"); return; }
+        setUserName(u.name);
+        setUserEmail(u.email);
+        setReady(true);
+      })
+      .catch(() => { clearToken(); router.replace("/login"); });
+  }, [router]);
+
+  const handleSignOut = () => { clearToken(); router.replace("/login"); };
+
+  if (!ready) return (
+    <div style={{ minHeight: "100vh", background: "#050508", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: "32px", height: "32px", border: "3px solid rgba(124,58,237,0.3)", borderTopColor: "#7C3AED", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+    </div>
+  );
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#050508" }}>
 
       {/* Desktop sidebar — always visible ≥768px */}
       <div style={{ width: "240px", flexShrink: 0, display: "flex", flexDirection: "column" }}>
-        <SidebarContent pathname={pathname} onNav={() => {}} />
+        <SidebarContent pathname={pathname} onNavClick={() => {}} onLogout={handleSignOut} userName={userName} userEmail={userEmail} />
       </div>
 
       {/* Mobile overlay */}
       {mobileOpen && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex" }}>
           <div style={{ width: "240px", flexShrink: 0, display: "flex", flexDirection: "column" }}>
-            <SidebarContent pathname={pathname} onNav={() => setMobileOpen(false)} />
+            <SidebarContent pathname={pathname} onNavClick={() => setMobileOpen(false)} onLogout={handleSignOut} userName={userName} userEmail={userEmail} />
           </div>
           <div style={{ flex: 1, background: "rgba(0,0,0,0.65)" }} onClick={() => setMobileOpen(false)} />
         </div>

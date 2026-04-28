@@ -1,8 +1,9 @@
 ﻿"use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { GraduationCap, LayoutDashboard, BookOpen, Users, Award, Activity, LogOut, ChevronRight, Menu } from "lucide-react";
+import { api, clearToken, getToken } from "../../lib/api";
 
 const NAV_LINKS = [
   { href: "/admin",              label: "Dashboard",   icon: LayoutDashboard },
@@ -12,7 +13,7 @@ const NAV_LINKS = [
   { href: "/admin/activity",     label: "Activity Log",icon: Activity },
 ];
 
-function SidebarContent({ pathname, onNav }: { pathname: string; onNav: () => void }) {
+function SidebarContent({ pathname, onNavClick, onLogout, adminName }: { pathname: string; onNavClick: () => void; onLogout: () => void; adminName: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#0A0A12", borderRight: "1px solid rgba(255,255,255,0.06)" }}>
       <div style={{ padding: "20px", display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
@@ -29,7 +30,7 @@ function SidebarContent({ pathname, onNav }: { pathname: string; onNav: () => vo
         {NAV_LINKS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== "/admin" && pathname.startsWith(href));
           return (
-            <Link key={href} href={href} onClick={onNav} style={{
+            <Link key={href} href={href} onClick={onNavClick} style={{
               display: "flex", alignItems: "center", gap: "12px",
               padding: "10px 12px", borderRadius: "10px", textDecoration: "none",
               fontSize: "14px", fontWeight: 600, transition: "all .15s",
@@ -49,13 +50,13 @@ function SidebarContent({ pathname, onNav }: { pathname: string; onNav: () => vo
         <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", marginBottom: "6px" }}>
           <div style={{ width: "34px", height: "34px", borderRadius: "50%", background: "linear-gradient(135deg,#7C3AED,#4C1D95)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: "13px", flexShrink: 0 }}>A</div>
           <div style={{ minWidth: 0 }}>
-            <p style={{ fontSize: "13px", fontWeight: 700, color: "#fff", margin: 0 }}>Admin</p>
+            <p style={{ fontSize: "13px", fontWeight: 700, color: "#fff", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{adminName}</p>
             <p style={{ fontSize: "10px", color: "#A78BFA", margin: 0, fontWeight: 600 }}>Administrator</p>
           </div>
         </div>
-        <Link href="/login" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "9px 12px", borderRadius: "10px", textDecoration: "none", fontSize: "13px", color: "rgba(255,255,255,0.45)", fontWeight: 600 }}>
+        <button onClick={onLogout} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "9px 12px", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.45)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", width: "100%" }}>
           <LogOut size={15} /> Logout
-        </Link>
+        </button>
       </div>
     </div>
   );
@@ -63,19 +64,41 @@ function SidebarContent({ pathname, onNav }: { pathname: string; onNav: () => vo
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [adminName, setAdminName]   = useState("");
+  const [ready, setReady]           = useState(false);
   const pathname = usePathname();
+  const router   = useRouter();
+
+  useEffect(() => {
+    if (!getToken()) { router.replace("/login"); return; }
+    api.profile.get()
+      .then(u => {
+        if (u.role !== "admin") { router.replace("/dashboard"); return; }
+        setAdminName(u.name);
+        setReady(true);
+      })
+      .catch(() => { clearToken(); router.replace("/login"); });
+  }, [router]);
+
+  const handleLogout = () => { clearToken(); router.replace("/login"); };
+
+  if (!ready) return (
+    <div style={{ minHeight: "100vh", background: "#050508", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: "32px", height: "32px", border: "3px solid rgba(124,58,237,0.3)", borderTopColor: "#7C3AED", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+    </div>
+  );
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#050508" }}>
 
       <div style={{ width: "240px", flexShrink: 0, display: "flex", flexDirection: "column" }}>
-        <SidebarContent pathname={pathname} onNav={() => {}} />
+        <SidebarContent pathname={pathname} onNavClick={() => {}} onLogout={handleLogout} adminName={adminName} />
       </div>
 
       {mobileOpen && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex" }}>
           <div style={{ width: "240px", flexShrink: 0, display: "flex", flexDirection: "column" }}>
-            <SidebarContent pathname={pathname} onNav={() => setMobileOpen(false)} />
+            <SidebarContent pathname={pathname} onNavClick={() => setMobileOpen(false)} onLogout={handleLogout} adminName={adminName} />
           </div>
           <div style={{ flex: 1, background: "rgba(0,0,0,0.65)" }} onClick={() => setMobileOpen(false)} />
         </div>

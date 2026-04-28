@@ -4,6 +4,7 @@ import Link from "next/link";
 import { GraduationCap, User, Mail, Lock, Phone, Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { api, saveToken } from "../../lib/api";
 
 export default function RegisterPage() {
   const [step, setStep]         = useState(1);
@@ -19,20 +20,31 @@ export default function RegisterPage() {
     if (form.password.length < 8) { toast.error("Password must be at least 8 characters."); return; }
     if (form.phone.length !== 10) { toast.error("Enter a valid 10-digit phone number."); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1000));
-    setLoading(false);
-    toast.success("OTP sent to your phone!");
-    setStep(2);
+    try {
+      await api.auth.register(form);
+      toast.success("OTP sent! Check the server console for the code.");
+      setStep(2);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otp) { toast.error("Enter the OTP."); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1200));
-    setLoading(false);
-    toast.success("Account created! Welcome to EduPath.");
-    router.push("/dashboard");
+    try {
+      const res = await api.auth.verifyOtp(form.email, otp);
+      saveToken(res.access_token);
+      toast.success("Account created! Welcome to EduPath.");
+      router.push(res.role === "admin" ? "/admin" : "/dashboard");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "OTP verification failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const inputStyle: React.CSSProperties = {
@@ -131,10 +143,9 @@ export default function RegisterPage() {
               <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", borderRadius: "10px", background: "rgba(74,222,128,0.05)", border: "1px solid rgba(74,222,128,0.2)", color: "#4ADE80", fontSize: "13px" }}>
                 <CheckCircle size={14} /> OTP sent to +91 {form.phone}
               </div>
-              {/* Demo hint */}
+              {/* Dev hint */}
               <div style={{ padding: "10px 14px", borderRadius: "10px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", fontSize: "12px" }}>
-                <span style={{ color: "rgba(255,255,255,0.25)" }}>Demo OTP: </span>
-                <span style={{ fontFamily: "monospace", color: "#22D3EE", fontWeight: 700, letterSpacing: "0.1em" }}>123456</span>
+                <span style={{ color: "rgba(255,255,255,0.25)" }}>Check the backend server console for your OTP.</span>
               </div>
               {/* OTP input */}
               <div>

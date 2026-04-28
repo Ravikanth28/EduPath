@@ -34,8 +34,8 @@ export default function AdminStudentsPage() {
     return sortDir === "asc" ? val : -val;
   });
 
-  const SortIcon = ({ key }: { key: typeof sortBy }) =>
-    sortBy === key ? (sortDir === "asc" ? <ChevronUp size={12} /> : <ChevronDown size={12} />) : null;
+  const SortIcon = ({ field }: { field: typeof sortBy }) =>
+    sortBy === field ? (sortDir === "asc" ? <ChevronUp size={12} /> : <ChevronDown size={12} />) : null;
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto">
@@ -95,7 +95,7 @@ export default function AdminStudentsPage() {
                 {[["Name", "name"], ["Contact", null], ["Courses", null], ["Progress", "progress"], ["Certs", null], ["Joined", "joined"], ["", null]].map(([label, key]) => (
                   <th key={label as string} className={`text-left px-4 py-3 text-xs text-white/40 font-semibold uppercase tracking-wider ${key ? "cursor-pointer hover:text-white/70 select-none" : ""}`}
                     onClick={key ? () => sort(key as typeof sortBy) : undefined}>
-                    <span className="flex items-center gap-1">{label as string}{key && <SortIcon key={key as typeof sortBy} />}</span>
+                    <span className="flex items-center gap-1">{label as string}{key && <SortIcon field={key as typeof sortBy} />}</span>
                   </th>
                 ))}
               </tr>

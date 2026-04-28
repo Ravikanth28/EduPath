@@ -38,14 +38,19 @@ export default function AdminCoursesPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: "Total Courses", value: COURSES.length, icon: BookOpen, color: "text-purple-400" },
-          { label: "Published", value: COURSES.filter(c => c.published).length, icon: CheckSquare, color: "text-green-400" },
-          { label: "Total Videos", value: COURSES.reduce((a, c) => a + c.videos, 0), icon: Video, color: "text-cyan-400" },
-          { label: "Enrollments", value: COURSES.reduce((a, c) => a + c.students, 0), icon: Users, color: "text-amber-400" },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="glass-card p-4 flex items-center gap-3">
-            <Icon size={18} className={color} />
-            <div><p className="text-lg font-bold text-white">{value}</p><p className="text-xs text-white/50">{label}</p></div>
+          { label: "Total Courses", value: COURSES.length, icon: BookOpen, color: "text-purple-400", bg: "bg-purple-600/10", border: "border-purple-600/20" },
+          { label: "Published", value: COURSES.filter(c => c.published).length, icon: CheckSquare, color: "text-green-400", bg: "bg-green-600/10", border: "border-green-600/20" },
+          { label: "Total Videos", value: COURSES.reduce((a, c) => a + c.videos, 0), icon: Video, color: "text-cyan-400", bg: "bg-cyan-600/10", border: "border-cyan-600/20" },
+          { label: "Enrollments", value: COURSES.reduce((a, c) => a + c.students, 0), icon: Users, color: "text-amber-400", bg: "bg-amber-600/10", border: "border-amber-600/20" },
+        ].map(({ label, value, icon: Icon, color, bg, border }) => (
+          <div key={label} className={`glass-card p-4 flex items-center gap-3.5 border ${border}`}>
+            <div className={`w-10 h-10 rounded-2xl ${bg} flex items-center justify-center flex-shrink-0`}>
+              <Icon size={19} className={color} />
+            </div>
+            <div>
+              <p className="text-xl font-bold text-white leading-none">{value}</p>
+              <p className="text-xs text-white/45 mt-1.5">{label}</p>
+            </div>
           </div>
         ))}
       </div>
@@ -81,39 +86,70 @@ export default function AdminCoursesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filtered.map(c => (
-            <div key={c.id} className={`glass-card overflow-hidden flex flex-col relative ${selected.includes(c.id) ? "border border-purple-500/40" : ""}`}>
-              {/* Checkbox */}
-              <button
-                onClick={() => toggleSelect(c.id)}
-                className="absolute top-3 left-3 z-10 w-5 h-5 rounded-md border transition-all flex items-center justify-center"
-                style={{ background: selected.includes(c.id) ? "#7C3AED" : "rgba(5,5,8,0.7)", borderColor: selected.includes(c.id) ? "#7C3AED" : "rgba(255,255,255,0.2)" }}
-              >
-                {selected.includes(c.id) && <CheckSquare size={12} className="text-white" />}
-              </button>
-              <div className={`h-2 bg-gradient-to-r ${c.color}`} />
-              <div className="p-5 flex flex-col flex-1">
-                <div className="flex items-start justify-between gap-2 mb-2 pl-5">
+            <div
+              key={c.id}
+              className="glass-card overflow-hidden flex flex-col"
+              style={{ border: selected.includes(c.id) ? "1px solid rgba(124,58,237,0.45)" : "1px solid rgba(255,255,255,0.06)" }}
+            >
+              {/* Colored accent strip */}
+              <div className={`h-1.5 bg-gradient-to-r ${c.color}`} />
+
+              <div className="p-5 flex flex-col flex-1 gap-3.5">
+                {/* Badge row: category left | status + checkbox right */}
+                <div className="flex items-center justify-between gap-2">
                   <span className="badge-purple text-xs">{c.category}</span>
-                  {c.published ? <span className="badge-green text-xs">Published</span> : <span className="badge-amber text-xs">Draft</span>}
+                  <div className="flex items-center gap-2">
+                    {c.published
+                      ? <span className="badge-green text-xs">Published</span>
+                      : <span className="badge-amber text-xs">Draft</span>
+                    }
+                    <button
+                      onClick={() => toggleSelect(c.id)}
+                      className="w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-all"
+                      style={{
+                        background: selected.includes(c.id) ? "#7C3AED" : "rgba(255,255,255,0.04)",
+                        borderColor: selected.includes(c.id) ? "#7C3AED" : "rgba(255,255,255,0.18)",
+                      }}
+                    >
+                      {selected.includes(c.id) && <CheckSquare size={11} className="text-white" />}
+                    </button>
+                  </div>
                 </div>
-                <h3 className="font-bold text-white mb-1">{c.title}</h3>
-                <p className="text-xs text-white/50 mb-3 flex-1">{c.desc}</p>
-                <div className="grid grid-cols-4 gap-2 mb-4">
-                  {[["Modules", c.modules], ["Videos", c.videos], ["Questions", c.questions], ["Students", c.students]].map(([l, v]) => (
-                    <div key={l as string} className="text-center py-1.5 rounded-lg bg-white/[0.03]">
-                      <p className="text-xs font-bold text-white">{v}</p>
-                      <p className="text-[10px] text-white/40">{l}</p>
+
+                {/* Title + desc */}
+                <div>
+                  <h3 className="font-bold text-white text-base mb-1.5 leading-snug">{c.title}</h3>
+                  <p className="text-xs text-white/50 leading-relaxed">{c.desc}</p>
+                </div>
+
+                {/* Inner stats */}
+                <div className="grid grid-cols-4 gap-2">
+                  {(["Modules", "Videos", "Questions", "Students"] as const).map((l, idx) => (
+                    <div key={l} className="text-center py-2 rounded-xl bg-white/[0.04] border border-white/[0.05]">
+                      <p className="text-sm font-bold text-white">{[c.modules, c.videos, c.questions, c.students][idx]}</p>
+                      <p className="text-[10px] text-white/40 mt-0.5">{l}</p>
                     </div>
                   ))}
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => toast.success(c.published ? "Course unpublished" : "Course published")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs transition-all border border-white/10 hover:border-white/20 text-white/60 hover:text-white">
+
+                {/* Actions */}
+                <div className="flex gap-2 mt-auto">
+                  <button
+                    onClick={() => toast.success(c.published ? "Course unpublished" : "Course published")}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all border border-white/10 hover:border-white/20 text-white/60 hover:text-white"
+                  >
                     <ToggleLeft size={13} /> {c.published ? "Unpublish" : "Publish"}
                   </button>
-                  <Link href={`/admin/courses/${c.id}`} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs btn-primary">
+                  <Link
+                    href={`/admin/courses/${c.id}`}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold btn-primary"
+                  >
                     <Settings size={13} /> Manage
                   </Link>
-                  <button onClick={() => setShowDeleteModal(c.id)} className="p-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors">
+                  <button
+                    onClick={() => setShowDeleteModal(c.id)}
+                    className="w-9 flex items-center justify-center rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors"
+                  >
                     <Trash2 size={14} />
                   </button>
                 </div>

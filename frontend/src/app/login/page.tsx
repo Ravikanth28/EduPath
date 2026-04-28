@@ -4,6 +4,7 @@ import Link from "next/link";
 import { GraduationCap, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { api, saveToken } from "../../lib/api";
 
 export default function LoginPage() {
   const [email, setEmail]       = useState("");
@@ -16,12 +17,15 @@ export default function LoginPage() {
     e.preventDefault();
     if (!email || !password) { toast.error("Please fill in all fields."); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1200));
-    setLoading(false);
-    if (email.includes("admin")) {
-      toast.success("Welcome back, Admin!"); router.push("/admin");
-    } else {
-      toast.success("Welcome back!"); router.push("/dashboard");
+    try {
+      const res = await api.auth.login(email, password);
+      saveToken(res.access_token);
+      toast.success(`Welcome back, ${res.name}!`);
+      router.push(res.role === "admin" ? "/admin" : "/dashboard");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      setLoading(false);
     }
   };
 
