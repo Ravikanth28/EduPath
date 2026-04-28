@@ -329,15 +329,154 @@ def get_course(
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(404, "Course not found")
-    return {
-        "id": course.id, "title": course.title, "desc": course.description,
-        "category": course.category, "modules": course.modules_count,
-        "videos": course.videos_count, "quizzes": course.quizzes_count,
-        "students": course.students_count, "grad": course.grad, "accent": course.accent,
+    enroll = db.query(Enrollment).filter(
+
+        Enrollment.user_id == current_user.id,
+
+        Enrollment.course_id == course.id,
+
+    ).first()
+
+    return {
+
+        "id": course.id, "title": course.title, "desc": course.description,
+
+        "category": course.category, "modules": course.modules_count,
+
+        "videos": course.videos_count, "quizzes": course.quizzes_count,
+
+        "students": course.students_count, "grad": course.grad, "accent": course.accent,
+
+        "enrolled": enroll is not None,
+
+        "progress": enroll.progress if enroll else 0,
+
+        "completed": enroll.progress == 100 if enroll else False,
+
     }
 
 
-@app.post("/courses", status_code=201)
+@app.post("/courses/{course_id}/modules/{module_num}/complete")
+
+def complete_module(
+
+    course_id: str,
+
+    module_num: int,
+
+    current_user: User = Depends(get_current_user),
+
+    db: Session = Depends(get_db),
+
+):
+
+    course = db.query(Course).filter(Course.id == course_id).first()
+
+    if not course:
+
+        raise HTTPException(404, "Course not found")
+
+    if module_num < 1 or module_num > course.modules_count:
+
+        raise HTTPException(400, "Invalid module number")
+
+    enroll = db.query(Enrollment).filter(
+
+        Enrollment.user_id == current_user.id,
+
+        Enrollment.course_id == course_id,
+
+    ).first()
+
+    if not enroll:
+
+        enroll = Enrollment(
+
+            id=str(uuid.uuid4()),
+
+            user_id=current_user.id,
+
+            course_id=course_id,
+
+            progress=0,
+
+        )
+
+        course.students_count += 1
+
+        db.add(enroll)
+
+    previous_progress = enroll.progress or 0
+
+    next_progress = round((module_num / course.modules_count) * 100)
+
+    enroll.progress = max(previous_progress, next_progress)
+
+    if previous_progress < 100 and enroll.progress == 100:
+
+        current_user.courses_completed = (current_user.courses_completed or 0) + 1
+
+        current_user.points = (current_user.points or 0) + 100
+
+        exists = db.query(Certificate).filter(
+
+            Certificate.student_id == current_user.id,
+
+            Certificate.course_name == course.title,
+
+        ).first()
+
+        if not exists:
+
+            db.add(Certificate(
+
+                id=f"CERT-{uuid.uuid4().hex[:8].upper()}",
+
+                course_name=course.title,
+
+                category=course.category,
+
+                student_id=current_user.id,
+
+                issued_date=datetime.utcnow().strftime("%B %d, %Y"),
+
+                status="verified",
+
+                grad=course.grad,
+
+                accent=course.accent,
+
+                accent_dim="rgba(47,69,216,0.12)",
+
+                accent_border="rgba(47,69,216,0.3)",
+
+            ))
+
+    db.add(ActivityLog(
+
+        student_name=current_user.name,
+
+        detail=f"Completed module {module_num} in {course.title}",
+
+    ))
+
+    db.commit()
+
+    return {
+
+        "message": "Module progress saved",
+
+        "progress": enroll.progress,
+
+        "completed_modules": round((enroll.progress / 100) * course.modules_count),
+
+        "completed": enroll.progress == 100,
+
+    }
+
+
+
+@app.post("/courses", status_code=201)
 def create_course(
     data: CourseCreateRequest,
     _: User = Depends(require_admin),
