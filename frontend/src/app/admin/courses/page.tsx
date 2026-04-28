@@ -15,12 +15,36 @@ export default function AdminCoursesPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
   const [showBulkDelete, setShowBulkDelete] = useState(false);
+  const [publishedMap, setPublishedMap] = useState<Record<string, boolean>>(
+    Object.fromEntries(COURSES.map(c => [c.id, c.published]))
+  );
+  const [courseList, setCourseList] = useState(COURSES);
 
-  const filtered = COURSES.filter(c => !search || c.title.toLowerCase().includes(search.toLowerCase()));
+  const filtered = courseList.filter(c => !search || c.title.toLowerCase().includes(search.toLowerCase()));
   const allSelected = filtered.length > 0 && filtered.every(c => selected.includes(c.id));
 
   const toggleSelect = (id: string) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
   const toggleAll = () => setSelected(allSelected ? [] : filtered.map(c => c.id));
+
+  const togglePublish = (id: string) => {
+    const isPublished = publishedMap[id];
+    setPublishedMap(m => ({ ...m, [id]: !isPublished }));
+    toast.success(isPublished ? "Course unpublished" : "Course published");
+  };
+
+  const handleDelete = (id: string) => {
+    setCourseList(list => list.filter(c => c.id !== id));
+    setSelected(s => s.filter(x => x !== id));
+    setShowDeleteModal(null);
+    toast.success("Course deleted");
+  };
+
+  const handleBulkDelete = () => {
+    setCourseList(list => list.filter(c => !selected.includes(c.id)));
+    toast.success(`${selected.length} courses deleted`);
+    setSelected([]);
+    setShowBulkDelete(false);
+  };
 
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto">
@@ -38,10 +62,10 @@ export default function AdminCoursesPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: "Total Courses", value: COURSES.length, icon: BookOpen, color: "text-purple-400", bg: "bg-purple-600/10", border: "border-purple-600/20" },
-          { label: "Published", value: COURSES.filter(c => c.published).length, icon: CheckSquare, color: "text-green-400", bg: "bg-green-600/10", border: "border-green-600/20" },
-          { label: "Total Videos", value: COURSES.reduce((a, c) => a + c.videos, 0), icon: Video, color: "text-cyan-400", bg: "bg-cyan-600/10", border: "border-cyan-600/20" },
-          { label: "Enrollments", value: COURSES.reduce((a, c) => a + c.students, 0), icon: Users, color: "text-amber-400", bg: "bg-amber-600/10", border: "border-amber-600/20" },
+          { label: "Total Courses", value: courseList.length, icon: BookOpen, color: "text-purple-400", bg: "bg-purple-600/10", border: "border-purple-600/20" },
+          { label: "Published", value: courseList.filter(c => publishedMap[c.id]).length, icon: CheckSquare, color: "text-green-400", bg: "bg-green-600/10", border: "border-green-600/20" },
+          { label: "Total Videos", value: courseList.reduce((a, c) => a + c.videos, 0), icon: Video, color: "text-cyan-400", bg: "bg-cyan-600/10", border: "border-cyan-600/20" },
+          { label: "Enrollments", value: courseList.reduce((a, c) => a + c.students, 0), icon: Users, color: "text-amber-400", bg: "bg-amber-600/10", border: "border-amber-600/20" },
         ].map(({ label, value, icon: Icon, color, bg, border }) => (
           <div key={label} className={`glass-card p-4 flex items-center gap-3.5 border ${border}`}>
             <div className={`w-10 h-10 rounded-2xl ${bg} flex items-center justify-center flex-shrink-0`}>
@@ -85,7 +109,9 @@ export default function AdminCoursesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {filtered.map(c => (
+          {filtered.map(c => {
+            const isPublished = publishedMap[c.id] ?? c.published;
+            return (
             <div
               key={c.id}
               className="glass-card overflow-hidden flex flex-col"
@@ -99,7 +125,7 @@ export default function AdminCoursesPage() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="badge-purple text-xs">{c.category}</span>
                   <div className="flex items-center gap-2">
-                    {c.published
+                    {isPublished
                       ? <span className="badge-green text-xs">Published</span>
                       : <span className="badge-amber text-xs">Draft</span>
                     }
@@ -135,10 +161,10 @@ export default function AdminCoursesPage() {
                 {/* Actions */}
                 <div className="flex gap-2 mt-auto">
                   <button
-                    onClick={() => toast.success(c.published ? "Course unpublished" : "Course published")}
+                    onClick={() => togglePublish(c.id)}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all border border-white/10 hover:border-white/20 text-white/60 hover:text-white"
                   >
-                    <ToggleLeft size={13} /> {c.published ? "Unpublish" : "Publish"}
+                    <ToggleLeft size={13} /> {isPublished ? "Unpublish" : "Publish"}
                   </button>
                   <Link
                     href={`/admin/courses/${c.id}`}
@@ -155,7 +181,8 @@ export default function AdminCoursesPage() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -170,7 +197,7 @@ export default function AdminCoursesPage() {
             <p className="text-sm text-white/50 text-center">This action cannot be undone. All modules, videos, and student progress will be lost.</p>
             <div className="flex gap-3">
               <button onClick={() => setShowDeleteModal(null)} className="btn-secondary flex-1 py-2.5 text-sm">Cancel</button>
-              <button onClick={() => { toast.success("Course deleted"); setShowDeleteModal(null); }} className="flex-1 py-2.5 text-sm rounded-xl bg-red-600/20 border border-red-600/30 text-red-400 hover:bg-red-600/30 transition-colors font-semibold">Delete</button>
+              <button onClick={() => handleDelete(showDeleteModal)} className="flex-1 py-2.5 text-sm rounded-xl bg-red-600/20 border border-red-600/30 text-red-400 hover:bg-red-600/30 transition-colors font-semibold">Delete</button>
             </div>
           </div>
         </div>
@@ -187,7 +214,7 @@ export default function AdminCoursesPage() {
             <p className="text-sm text-white/50 text-center">This will permanently delete all selected courses and their data.</p>
             <div className="flex gap-3">
               <button onClick={() => setShowBulkDelete(false)} className="btn-secondary flex-1 py-2.5 text-sm">Cancel</button>
-              <button onClick={() => { toast.success(`${selected.length} courses deleted`); setSelected([]); setShowBulkDelete(false); }} className="flex-1 py-2.5 text-sm rounded-xl bg-red-600/20 border border-red-600/30 text-red-400 hover:bg-red-600/30 transition-colors font-semibold">Delete All</button>
+              <button onClick={handleBulkDelete} className="flex-1 py-2.5 text-sm rounded-xl bg-red-600/20 border border-red-600/30 text-red-400 hover:bg-red-600/30 transition-colors font-semibold">Delete All</button>
             </div>
           </div>
         </div>

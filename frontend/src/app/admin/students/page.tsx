@@ -1,10 +1,10 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Users, Award, TrendingUp, Filter, ChevronUp, ChevronDown, UserPlus, BookOpen, MoreVertical, X, Eye } from "lucide-react";
+import { Search, Users, Award, TrendingUp, Filter, ChevronUp, ChevronDown, UserPlus, BookOpen, X, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 
-const STUDENTS = [
+const INITIAL_STUDENTS = [
   { id: "1", name: "Arjun Sharma", phone: "9876543210", email: "arjun@example.com", courses: 3, progress: 72, certs: 1, joined: "Mar 10, 2026", status: "active", enrolled: true },
   { id: "2", name: "Priya Nair", phone: "9876543211", email: "priya@example.com", courses: 2, progress: 91, certs: 2, joined: "Feb 28, 2026", status: "active", enrolled: true },
   { id: "3", name: "Rahul Mehta", phone: "9876543212", email: "rahul@example.com", courses: 1, progress: 35, certs: 0, joined: "Apr 5, 2026", status: "inactive", enrolled: true },
@@ -13,18 +13,20 @@ const STUDENTS = [
 ];
 
 export default function AdminStudentsPage() {
+  const [students, setStudents] = useState(INITIAL_STUDENTS);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "progress" | "joined">("joined");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [showRegister, setShowRegister] = useState(false);
   const [regForm, setRegForm] = useState({ name: "", email: "", phone: "", password: "" });
+  const [regErrors, setRegErrors] = useState<Record<string, string>>({});
 
   const sort = (key: typeof sortBy) => {
     if (sortBy === key) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortBy(key); setSortDir("asc"); }
   };
 
-  const filtered = STUDENTS.filter(s =>
+  const filtered = students.filter(s =>
     !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.phone.includes(search) || s.email.toLowerCase().includes(search.toLowerCase())
   ).sort((a, b) => {
     let val = 0;
@@ -37,20 +39,57 @@ export default function AdminStudentsPage() {
   const SortIcon = ({ field }: { field: typeof sortBy }) =>
     sortBy === field ? (sortDir === "asc" ? <ChevronUp size={12} /> : <ChevronDown size={12} />) : null;
 
+  const validateRegForm = () => {
+    const errors: Record<string, string> = {};
+    if (!regForm.name.trim()) errors.name = "Name is required";
+    if (!regForm.email.trim()) errors.email = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regForm.email)) errors.email = "Invalid email format";
+    if (!regForm.phone.trim()) errors.phone = "Phone is required";
+    else if (!/^\d{10}$/.test(regForm.phone.replace(/\s/g, ""))) errors.phone = "Phone must be 10 digits";
+    if (!regForm.password) errors.password = "Password is required";
+    else if (regForm.password.length < 6) errors.password = "Password must be at least 6 characters";
+    return errors;
+  };
+
+  const handleRegister = () => {
+    const errors = validateRegForm();
+    if (Object.keys(errors).length > 0) { setRegErrors(errors); return; }
+    const newStudent = {
+      id: String(students.length + 1),
+      name: regForm.name.trim(),
+      phone: regForm.phone.trim(),
+      email: regForm.email.trim(),
+      courses: 0, progress: 0, certs: 0,
+      joined: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      status: "not_started", enrolled: false,
+    };
+    setStudents(s => [newStudent, ...s]);
+    toast.success("Student registered successfully!");
+    setShowRegister(false);
+    setRegForm({ name: "", email: "", phone: "", password: "" });
+    setRegErrors({});
+  };
+
+  const closeRegister = () => {
+    setShowRegister(false);
+    setRegForm({ name: "", email: "", phone: "", password: "" });
+    setRegErrors({});
+  };
+
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-white">Students</h1><p className="text-white/50 text-sm mt-0.5">{STUDENTS.length} registered users</p></div>
+        <div><h1 className="text-2xl font-bold text-white">Students</h1><p className="text-white/50 text-sm mt-0.5">{students.length} registered users</p></div>
         <button onClick={() => setShowRegister(true)} className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm"><UserPlus size={16} /> Register User</button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: "Total Students", value: STUDENTS.length, icon: Users, color: "text-purple-400" },
-          { label: "Enrolled", value: STUDENTS.filter(s => s.enrolled).length, icon: BookOpen, color: "text-cyan-400" },
-          { label: "Certificates", value: STUDENTS.reduce((a, s) => a + s.certs, 0), icon: Award, color: "text-amber-400" },
-          { label: "Not Started", value: STUDENTS.filter(s => s.status === "not_started").length, icon: TrendingUp, color: "text-red-400" },
+          { label: "Total Students", value: students.length, icon: Users, color: "text-purple-400" },
+          { label: "Enrolled", value: students.filter(s => s.enrolled).length, icon: BookOpen, color: "text-cyan-400" },
+          { label: "Certificates", value: students.reduce((a, s) => a + s.certs, 0), icon: Award, color: "text-amber-400" },
+          { label: "Not Started", value: students.filter(s => s.status === "not_started").length, icon: TrendingUp, color: "text-red-400" },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="glass-card p-4 flex items-center gap-3">
             <Icon size={18} className={color} />
@@ -62,10 +101,10 @@ export default function AdminStudentsPage() {
       {/* Analytics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: "Scope", value: `${STUDENTS.length}`, sub: "Registered" },
-          { label: "Enrolled", value: `${STUDENTS.filter(s => s.enrolled).length}`, sub: "In a course" },
-          { label: "Completed", value: `${STUDENTS.filter(s => s.progress >= 100).length}`, sub: "All modules" },
-          { label: "In Progress", value: `${STUDENTS.filter(s => s.progress > 0 && s.progress < 100).length}`, sub: "Active learners" },
+          { label: "Scope", value: students.length, sub: "Registered" },
+          { label: "Enrolled", value: students.filter(s => s.enrolled).length, sub: "In a course" },
+          { label: "Completed", value: students.filter(s => s.progress >= 100).length, sub: "All modules" },
+          { label: "In Progress", value: students.filter(s => s.progress > 0 && s.progress < 100).length, sub: "Active learners" },
         ].map(({ label, value, sub }) => (
           <div key={label} className="glass-card p-4 text-center">
             <p className="text-2xl font-black gradient-text">{value}</p>
@@ -101,7 +140,11 @@ export default function AdminStudentsPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(s => (
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-white/40 text-sm">No students found.</td>
+                </tr>
+              ) : filtered.map(s => (
                 <tr key={s.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -151,17 +194,23 @@ export default function AdminStudentsPage() {
           <div className="glass-card p-6 max-w-md w-full space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-white">Register New Student</h3>
-              <button onClick={() => setShowRegister(false)} className="text-white/40 hover:text-white"><X size={18} /></button>
+              <button onClick={closeRegister} className="text-white/40 hover:text-white"><X size={18} /></button>
             </div>
-            {[["Full Name", "name", "text"], ["Email", "email", "email"], ["Phone", "phone", "tel"], ["Temporary Password", "password", "password"]].map(([label, key, type]) => (
+            {[["Full Name", "name", "text"], ["Email", "email", "email"], ["Phone (10 digits)", "phone", "tel"], ["Temporary Password", "password", "password"]].map(([label, key, type]) => (
               <div key={key as string}>
                 <label className="text-xs text-white/40 mb-1 block">{label as string}</label>
-                <input type={type as string} value={(regForm as Record<string, string>)[key as string]} onChange={e => setRegForm(f => ({ ...f, [key as string]: e.target.value }))} className="input-field" />
+                <input
+                  type={type as string}
+                  value={(regForm as Record<string, string>)[key as string]}
+                  onChange={e => { setRegForm(f => ({ ...f, [key as string]: e.target.value })); setRegErrors(r => { const n = { ...r }; delete n[key as string]; return n; }); }}
+                  className={`input-field ${regErrors[key as string] ? "border-red-500/50" : ""}`}
+                />
+                {regErrors[key as string] && <p className="text-xs text-red-400 mt-1">{regErrors[key as string]}</p>}
               </div>
             ))}
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setShowRegister(false)} className="btn-secondary flex-1 py-2.5 text-sm">Cancel</button>
-              <button onClick={() => { toast.success("Student registered!"); setShowRegister(false); }} className="btn-primary flex-1 py-2.5 text-sm">Register</button>
+              <button onClick={closeRegister} className="btn-secondary flex-1 py-2.5 text-sm">Cancel</button>
+              <button onClick={handleRegister} className="btn-primary flex-1 py-2.5 text-sm">Register</button>
             </div>
           </div>
         </div>
