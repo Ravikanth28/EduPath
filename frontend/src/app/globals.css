@@ -78,10 +78,15 @@ body {
   color: #fff;
   border: none;
   border-radius: 12px;
-  padding: 10px 24px;
+  padding: 0 24px;
+  height: 44px;
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.2s, box-shadow 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
 .btn-primary:hover {
   opacity: 0.9;
@@ -97,10 +102,14 @@ body {
   color: #fff;
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 12px;
-  padding: 10px 24px;
+  padding: 0 24px;
+  height: 44px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .btn-secondary:hover {
   background: rgba(255,255,255,0.08);
@@ -113,11 +122,16 @@ body {
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 12px;
   color: #fff;
-  padding: 12px 16px;
+  padding: 0 16px;
+  height: 44px;
   width: 100%;
   font-size: 14px;
   transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
+}
+textarea.input-field {
+  height: auto;
+  padding: 12px 16px;
 }
 .input-field::placeholder { color: rgba(255,255,255,0.35); }
 .input-field:focus {

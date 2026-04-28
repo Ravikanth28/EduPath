@@ -1,13 +1,13 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Plus, Trash2, BookOpen, Video, HelpCircle, Users, ToggleLeft, Settings, CheckSquare } from "lucide-react";
+import { Search, Plus, Trash2, BookOpen, Video, Users, Settings, CheckSquare, CheckCircle, EyeOff, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 
 const COURSES = [
-  { id: "1", title: "Engineering Mathematics", category: "Mathematics", desc: "Calculus, Linear Algebra, Differential Equations.", modules: 6, videos: 18, questions: 90, students: 420, published: true, color: "from-purple-600 to-blue-600" },
-  { id: "2", title: "Physics Mechanics", category: "Physics", desc: "Newton's laws, kinematics, and energy systems.", modules: 5, videos: 15, questions: 75, students: 380, published: true, color: "from-cyan-600 to-teal-600" },
-  { id: "3", title: "Chemistry Fundamentals", category: "Chemistry", desc: "Organic, inorganic and physical chemistry.", modules: 8, videos: 24, questions: 120, students: 290, published: false, color: "from-orange-600 to-red-600" },
+  { id: "1", title: "Engineering Mathematics", category: "Mathematics", desc: "Calculus, Linear Algebra, Differential Equations.", modules: 6, videos: 18, questions: 90, students: 420, published: true, grad: "linear-gradient(90deg,#7C3AED,#2563EB)", accent: "#7C3AED" },
+  { id: "2", title: "Physics Mechanics", category: "Physics", desc: "Newton's laws, kinematics, and energy systems.", modules: 5, videos: 15, questions: 75, students: 380, published: true, grad: "linear-gradient(90deg,#0891B2,#0D9488)", accent: "#0891B2" },
+  { id: "3", title: "Chemistry Fundamentals", category: "Chemistry", desc: "Organic, inorganic and physical chemistry.", modules: 8, videos: 24, questions: 120, students: 290, published: false, grad: "linear-gradient(90deg,#EA580C,#DC2626)", accent: "#EA580C" },
 ];
 
 export default function AdminCoursesPage() {
@@ -47,55 +47,64 @@ export default function AdminCoursesPage() {
   };
 
   return (
-    <div className="p-6 space-y-5 max-w-7xl mx-auto">
+    <div style={{ padding: "28px 24px", maxWidth: "1180px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "24px" }}>
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
         <div>
-          <h1 className="text-2xl font-bold text-white">Courses</h1>
-          <p className="text-white/50 text-sm mt-0.5">{COURSES.length} total courses</p>
+          <h1 style={{ color: "#fff", fontWeight: 800, fontSize: "24px", margin: "0 0 4px" }}>Courses</h1>
+          <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "14px", margin: 0 }}>{courseList.length} total courses</p>
         </div>
-        <Link href="/admin/courses/new" className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm">
+        <Link href="/admin/courses/new" style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 20px", height: "44px", background: "linear-gradient(135deg,#7C3AED,#06B6D4)", color: "#fff", borderRadius: "12px", fontSize: "14px", fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>
           <Plus size={16} /> New Course
         </Link>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Stats row */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px" }}>
         {[
-          { label: "Total Courses", value: courseList.length, icon: BookOpen, color: "text-purple-400", bg: "bg-purple-600/10", border: "border-purple-600/20" },
-          { label: "Published", value: courseList.filter(c => publishedMap[c.id]).length, icon: CheckSquare, color: "text-green-400", bg: "bg-green-600/10", border: "border-green-600/20" },
-          { label: "Total Videos", value: courseList.reduce((a, c) => a + c.videos, 0), icon: Video, color: "text-cyan-400", bg: "bg-cyan-600/10", border: "border-cyan-600/20" },
-          { label: "Enrollments", value: courseList.reduce((a, c) => a + c.students, 0), icon: Users, color: "text-amber-400", bg: "bg-amber-600/10", border: "border-amber-600/20" },
-        ].map(({ label, value, icon: Icon, color, bg, border }) => (
-          <div key={label} className={`glass-card p-4 flex items-center gap-3.5 border ${border}`}>
-            <div className={`w-10 h-10 rounded-2xl ${bg} flex items-center justify-center flex-shrink-0`}>
-              <Icon size={19} className={color} />
+          { label: "Total Courses",  value: courseList.length,                                      icon: BookOpen,     accent: "#A78BFA", bg: "rgba(124,58,237,0.1)"  },
+          { label: "Published",      value: courseList.filter(c => publishedMap[c.id]).length,      icon: CheckSquare,  accent: "#4ADE80", bg: "rgba(74,222,128,0.1)"  },
+          { label: "Total Videos",   value: courseList.reduce((a, c) => a + c.videos, 0),           icon: Video,        accent: "#22D3EE", bg: "rgba(6,182,212,0.1)"   },
+          { label: "Enrollments",    value: courseList.reduce((a, c) => a + c.students, 0),         icon: Users,        accent: "#FCD34D", bg: "rgba(252,211,77,0.1)"  },
+        ].map(({ label, value, icon: Icon, accent, bg }) => (
+          <div key={label} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "16px 18px", display: "flex", alignItems: "center", gap: "14px" }}>
+            <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Icon size={18} color={accent} />
             </div>
             <div>
-              <p className="text-xl font-bold text-white leading-none">{value}</p>
-              <p className="text-xs text-white/45 mt-1.5">{label}</p>
+              <p style={{ fontSize: "22px", fontWeight: 800, color: "#fff", margin: "0 0 2px", lineHeight: 1 }}>{value}</p>
+              <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", margin: 0 }}>{label}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search courses..." className="input-field pl-10" />
+      {/* Search + Select All */}
+      <div style={{ display: "flex", gap: "12px" }}>
+        <div style={{ position: "relative", flex: 1 }}>
+          <Search size={15} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.35)", pointerEvents: "none" }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search courses..."
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: "12px", color: "#fff", padding: "0 16px 0 42px", height: "44px", width: "100%", fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+          />
         </div>
-        <button onClick={toggleAll} className="btn-secondary flex items-center gap-2 px-4 py-2.5 text-sm">
+        <button
+          onClick={toggleAll}
+          style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 18px", height: "44px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "12px", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer", flexShrink: 0 }}
+        >
           <CheckSquare size={15} /> {allSelected ? "Deselect All" : "Select All"}
         </button>
       </div>
 
       {/* Bulk action bar */}
       {selected.length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
-          <span className="text-sm text-white">{selected.length} selected</span>
-          <button onClick={() => setSelected([])} className="text-xs text-white/50 hover:text-white ml-2">Clear</button>
-          <button onClick={() => setShowBulkDelete(true)} className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600/20 text-red-400 border border-red-600/30 text-sm hover:bg-red-600/30 transition-colors">
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", borderRadius: "12px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+          <span style={{ fontSize: "13px", color: "#fff" }}>{selected.length} selected</span>
+          <button onClick={() => setSelected([])} style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)", background: "none", border: "none", cursor: "pointer", marginLeft: "4px" }}>Clear</button>
+          <button onClick={() => setShowBulkDelete(true)} style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px", borderRadius: "10px", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", color: "#F87171", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
             <Trash2 size={14} /> Delete Selected
           </button>
         </div>
@@ -103,84 +112,85 @@ export default function AdminCoursesPage() {
 
       {/* Course grid */}
       {filtered.length === 0 ? (
-        <div className="glass-card p-10 text-center">
-          <BookOpen size={32} className="text-white/20 mx-auto mb-3" />
-          <p className="text-white/50">No courses found.</p>
+        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "16px", padding: "48px 24px", textAlign: "center" }}>
+          <BookOpen size={36} style={{ color: "rgba(255,255,255,0.15)", margin: "0 auto 12px", display: "block" }} />
+          <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "14px", margin: 0 }}>No courses found.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" }}>
           {filtered.map(c => {
             const isPublished = publishedMap[c.id] ?? c.published;
+            const isSelected = selected.includes(c.id);
             return (
-            <div
-              key={c.id}
-              className="glass-card overflow-hidden flex flex-col"
-              style={{ border: selected.includes(c.id) ? "1px solid rgba(124,58,237,0.45)" : "1px solid rgba(255,255,255,0.06)" }}
-            >
-              {/* Colored accent strip */}
-              <div className={`h-1.5 bg-gradient-to-r ${c.color}`} />
+              <div
+                key={c.id}
+                style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${isSelected ? `${c.accent}60` : "rgba(255,255,255,0.08)"}`, borderRadius: "18px", overflow: "hidden", display: "flex", flexDirection: "column", transition: "border-color .2s, box-shadow .2s", boxShadow: isSelected ? `0 0 0 2px ${c.accent}30` : "none" }}
+              >
+                {/* Accent bar */}
+                <div style={{ height: "4px", background: c.grad }} />
 
-              <div className="p-5 flex flex-col flex-1 gap-3.5">
-                {/* Badge row: category left | status + checkbox right */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="badge-purple text-xs">{c.category}</span>
-                  <div className="flex items-center gap-2">
-                    {isPublished
-                      ? <span className="badge-green text-xs">Published</span>
-                      : <span className="badge-amber text-xs">Draft</span>
-                    }
+                <div style={{ padding: "20px", display: "flex", flexDirection: "column", flex: 1, gap: "14px" }}>
+
+                  {/* Badge row */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 10px", borderRadius: "20px", background: `${c.accent}22`, color: c.accent, border: `1px solid ${c.accent}44` }}>
+                        {c.category}
+                      </span>
+                      {isPublished
+                        ? <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 10px", borderRadius: "20px", background: "rgba(16,185,129,0.12)", color: "#34D399", border: "1px solid rgba(16,185,129,0.3)", display: "inline-flex", alignItems: "center", gap: "4px" }}><CheckCircle size={10} /> Published</span>
+                        : <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 10px", borderRadius: "20px", background: "rgba(245,158,11,0.12)", color: "#FBBF24", border: "1px solid rgba(245,158,11,0.3)" }}>Draft</span>
+                      }
+                    </div>
+                    {/* Checkbox */}
                     <button
                       onClick={() => toggleSelect(c.id)}
-                      className="w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-all"
-                      style={{
-                        background: selected.includes(c.id) ? "#7C3AED" : "rgba(255,255,255,0.04)",
-                        borderColor: selected.includes(c.id) ? "#7C3AED" : "rgba(255,255,255,0.18)",
-                      }}
+                      style={{ width: "22px", height: "22px", borderRadius: "6px", border: `1.5px solid ${isSelected ? c.accent : "rgba(255,255,255,0.2)"}`, background: isSelected ? c.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all .15s" }}
                     >
-                      {selected.includes(c.id) && <CheckSquare size={11} className="text-white" />}
+                      {isSelected && <CheckSquare size={12} color="#fff" />}
                     </button>
                   </div>
-                </div>
 
-                {/* Title + desc */}
-                <div>
-                  <h3 className="font-bold text-white text-base mb-1.5 leading-snug">{c.title}</h3>
-                  <p className="text-xs text-white/50 leading-relaxed">{c.desc}</p>
-                </div>
+                  {/* Title + desc */}
+                  <div>
+                    <h3 style={{ color: "#fff", fontWeight: 700, fontSize: "16px", margin: "0 0 6px", lineHeight: "1.3" }}>{c.title}</h3>
+                    <p style={{ color: "rgba(255,255,255,0.48)", fontSize: "13px", lineHeight: "1.55", margin: 0 }}>{c.desc}</p>
+                  </div>
 
-                {/* Inner stats */}
-                <div className="grid grid-cols-4 gap-2">
-                  {(["Modules", "Videos", "Questions", "Students"] as const).map((l, idx) => (
-                    <div key={l} className="text-center py-2 rounded-xl bg-white/[0.04] border border-white/[0.05]">
-                      <p className="text-sm font-bold text-white">{[c.modules, c.videos, c.questions, c.students][idx]}</p>
-                      <p className="text-[10px] text-white/40 mt-0.5">{l}</p>
-                    </div>
-                  ))}
-                </div>
+                  {/* Stats */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "6px" }}>
+                    {([["Modules", c.modules], ["Videos", c.videos], ["Questions", c.questions], ["Students", c.students]] as const).map(([label, val]) => (
+                      <div key={label} style={{ background: "rgba(255,255,255,0.04)", borderRadius: "10px", padding: "8px 4px", textAlign: "center" }}>
+                        <p style={{ color: "#fff", fontSize: "13px", fontWeight: 700, margin: "0 0 2px" }}>{val}</p>
+                        <p style={{ color: "rgba(255,255,255,0.38)", fontSize: "10px", margin: 0 }}>{label}</p>
+                      </div>
+                    ))}
+                  </div>
 
-                {/* Actions */}
-                <div className="flex gap-2 mt-auto">
-                  <button
-                    onClick={() => togglePublish(c.id)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all border border-white/10 hover:border-white/20 text-white/60 hover:text-white"
-                  >
-                    <ToggleLeft size={13} /> {isPublished ? "Unpublish" : "Publish"}
-                  </button>
-                  <Link
-                    href={`/admin/courses/${c.id}`}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold btn-primary"
-                  >
-                    <Settings size={13} /> Manage
-                  </Link>
-                  <button
-                    onClick={() => setShowDeleteModal(c.id)}
-                    className="w-9 flex items-center justify-center rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {/* Action buttons */}
+                  <div style={{ marginTop: "auto", display: "flex", gap: "8px" }}>
+                    <button
+                      onClick={() => togglePublish(c.id)}
+                      style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 14px", height: "42px", borderRadius: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)", flexShrink: 0, transition: "all .15s" }}
+                    >
+                      {isPublished ? <><EyeOff size={14} /> Unpublish</> : <><Eye size={14} /> Publish</>}
+                    </button>
+                    <Link
+                      href={`/admin/courses/${c.id}`}
+                      style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", height: "42px", borderRadius: "12px", fontSize: "13px", fontWeight: 700, textDecoration: "none", color: "#fff", background: c.grad, transition: "opacity .2s" }}
+                    >
+                      <Settings size={14} /> Manage
+                    </Link>
+                    <button
+                      onClick={() => setShowDeleteModal(c.id)}
+                      style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "12px", border: "1px solid rgba(239,68,68,0.2)", background: "transparent", color: "#F87171", cursor: "pointer", flexShrink: 0, transition: "background .15s" }}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+
                 </div>
               </div>
-            </div>
             );
           })}
         </div>
@@ -188,16 +198,18 @@ export default function AdminCoursesPage() {
 
       {/* Delete modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="glass-card p-6 max-w-sm w-full space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto">
-              <Trash2 size={24} className="text-red-400" />
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", padding: "16px" }}>
+          <div style={{ background: "#0D0D1A", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "20px", padding: "28px", maxWidth: "380px", width: "100%", display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: "rgba(239,68,68,0.12)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto" }}>
+              <Trash2 size={22} color="#F87171" />
             </div>
-            <h3 className="text-white font-bold text-center">Delete Course?</h3>
-            <p className="text-sm text-white/50 text-center">This action cannot be undone. All modules, videos, and student progress will be lost.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowDeleteModal(null)} className="btn-secondary flex-1 py-2.5 text-sm">Cancel</button>
-              <button onClick={() => handleDelete(showDeleteModal)} className="flex-1 py-2.5 text-sm rounded-xl bg-red-600/20 border border-red-600/30 text-red-400 hover:bg-red-600/30 transition-colors font-semibold">Delete</button>
+            <div style={{ textAlign: "center" }}>
+              <h3 style={{ color: "#fff", fontWeight: 700, fontSize: "16px", margin: "0 0 6px" }}>Delete Course?</h3>
+              <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "13px", lineHeight: "1.55", margin: 0 }}>This action cannot be undone. All modules, videos, and student progress will be lost.</p>
+            </div>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={() => setShowDeleteModal(null)} style={{ flex: 1, height: "42px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => handleDelete(showDeleteModal)} style={{ flex: 1, height: "42px", borderRadius: "12px", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", color: "#F87171", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>Delete</button>
             </div>
           </div>
         </div>
@@ -205,16 +217,18 @@ export default function AdminCoursesPage() {
 
       {/* Bulk delete modal */}
       {showBulkDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="glass-card p-6 max-w-sm w-full space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto">
-              <Trash2 size={24} className="text-red-400" />
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", padding: "16px" }}>
+          <div style={{ background: "#0D0D1A", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "20px", padding: "28px", maxWidth: "380px", width: "100%", display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: "rgba(239,68,68,0.12)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto" }}>
+              <Trash2 size={22} color="#F87171" />
             </div>
-            <h3 className="text-white font-bold text-center">Delete {selected.length} Courses?</h3>
-            <p className="text-sm text-white/50 text-center">This will permanently delete all selected courses and their data.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowBulkDelete(false)} className="btn-secondary flex-1 py-2.5 text-sm">Cancel</button>
-              <button onClick={handleBulkDelete} className="flex-1 py-2.5 text-sm rounded-xl bg-red-600/20 border border-red-600/30 text-red-400 hover:bg-red-600/30 transition-colors font-semibold">Delete All</button>
+            <div style={{ textAlign: "center" }}>
+              <h3 style={{ color: "#fff", fontWeight: 700, fontSize: "16px", margin: "0 0 6px" }}>Delete {selected.length} Courses?</h3>
+              <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "13px", lineHeight: "1.55", margin: 0 }}>This will permanently delete all selected courses and their data.</p>
+            </div>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={() => setShowBulkDelete(false)} style={{ flex: 1, height: "42px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+              <button onClick={handleBulkDelete} style={{ flex: 1, height: "42px", borderRadius: "12px", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", color: "#F87171", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>Delete All</button>
             </div>
           </div>
         </div>

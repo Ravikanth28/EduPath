@@ -48,10 +48,10 @@ export default function AdminDashboard() {
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   const statCards = [
-    { icon: BookOpen, label: "Total Courses",   value: stats?.total_courses      ?? "â€”", accent: "#A78BFA", bg: "rgba(124,58,237,0.1)"  },
-    { icon: Layers,   label: "Active Students", value: stats?.active_students    ?? "â€”", accent: "#22D3EE", bg: "rgba(6,182,212,0.1)"   },
-    { icon: Users,    label: "Total Students",  value: stats?.total_students     ?? "â€”", accent: "#60A5FA", bg: "rgba(59,130,246,0.1)"  },
-    { icon: Award,    label: "Certificates",    value: stats?.total_certificates ?? "â€”", accent: "#FCD34D", bg: "rgba(252,211,77,0.1)"  },
+    { icon: BookOpen, label: "Total Courses",   value: stats?.total_courses      ?? "—", accent: "#A78BFA", bg: "rgba(124,58,237,0.1)"  },
+    { icon: Layers,   label: "Active Students", value: stats?.active_students    ?? "—", accent: "#22D3EE", bg: "rgba(6,182,212,0.1)"   },
+    { icon: Users,    label: "Total Students",  value: stats?.total_students     ?? "—", accent: "#60A5FA", bg: "rgba(59,130,246,0.1)"  },
+    { icon: Award,    label: "Certificates",    value: stats?.total_certificates ?? "—", accent: "#FCD34D", bg: "rgba(252,211,77,0.1)"  },
   ];
 
   return (
@@ -65,12 +65,12 @@ export default function AdminDashboard() {
           <div>
             <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "13px", marginBottom: "6px" }}>{greeting},</p>
             <h1 style={{ fontSize: "clamp(22px,3vw,30px)", fontWeight: 800, color: "#fff", margin: "0 0 8px", letterSpacing: "-0.5px" }}>
-              Welcome back, <span style={{ background: "linear-gradient(135deg,#A78BFA,#22D3EE)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Admin</span> ðŸ‘‹
+              Welcome back, <span style={{ background: "linear-gradient(135deg,#A78BFA,#22D3EE)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Admin</span> 👋
             </h1>
             <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "14px", marginBottom: "20px" }}>
               {stats
-                ? `${stats.total_students} students Â· ${stats.total_courses} courses Â· ${stats.total_certificates} certificates`
-                : "Loading platform dataâ€¦"}
+                ? `${stats.total_students} students · ${stats.total_courses} courses · ${stats.total_certificates} certificates`
+                : "Loading platform data…"}
             </p>
             <Link href="/admin/courses/new" style={{ display: "inline-flex", alignItems: "center", gap: "7px", padding: "10px 20px", background: "linear-gradient(135deg,#7C3AED,#06B6D4)", color: "#fff", borderRadius: "10px", fontSize: "13px", fontWeight: 700, textDecoration: "none" }}>
               <Plus size={14} /> New Course
@@ -191,7 +191,7 @@ export default function AdminDashboard() {
         <div style={{ ...card, padding: "22px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
             <p style={{ fontWeight: 700, color: "#fff", fontSize: "14px", margin: 0 }}>Recent Activity</p>
-            <Link href="/admin/activity" style={{ fontSize: "12px", color: "#A78BFA", textDecoration: "none", fontWeight: 600 }}>View all â†’</Link>
+            <Link href="/admin/activity" style={{ fontSize: "12px", color: "#A78BFA", textDecoration: "none", fontWeight: 600 }}>View all →</Link>
           </div>
           {activity.length === 0 ? (
             <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.25)", textAlign: "center", padding: "24px 0" }}>No activity yet</p>
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
               <p style={{ fontWeight: 700, color: "#fff", fontSize: "14px", margin: 0, display: "flex", alignItems: "center", gap: "6px" }}>
                 <TrendingUp size={14} color="#A78BFA" style={{ flexShrink: 0 }} /> Top Students
               </p>
-              <Link href="/admin/leaderboard" style={{ fontSize: "12px", color: "#A78BFA", textDecoration: "none", fontWeight: 600 }}>Full â†’</Link>
+              <Link href="/admin/leaderboard" style={{ fontSize: "12px", color: "#A78BFA", textDecoration: "none", fontWeight: 600 }}>Full →</Link>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {leaders.length === 0 ? (
@@ -246,7 +246,7 @@ export default function AdminDashboard() {
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
               <p style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>Recently Joined</p>
-              <Link href="/admin/students" style={{ fontSize: "12px", color: "#A78BFA", textDecoration: "none", fontWeight: 600 }}>All â†’</Link>
+              <Link href="/admin/students" style={{ fontSize: "12px", color: "#A78BFA", textDecoration: "none", fontWeight: 600 }}>All →</Link>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {students.length === 0 ? (

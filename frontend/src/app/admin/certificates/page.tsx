@@ -1,258 +1,561 @@
 "use client";
-import { useState } from "react";
-import React from "react";
-import { Award, CheckCircle, Clock, XCircle, Search, Download, Copy, X } from "lucide-react";
+import { useState, useMemo } from "react";
+import {
+  Shield, CheckCircle, Clock, XCircle, FileText, Search, Download,
+  Copy, X, Filter, ChevronUp, ChevronDown, RefreshCw, ArrowUpDown,
+} from "lucide-react";
 import toast from "react-hot-toast";
 
-const CERTS = [
-  { id: "CERT-DEMO-001", student: "Arjun Sharma", phone: "9876543210", course: "Engineering Mathematics", category: "Mathematics", issued: "Apr 20, 2026", status: "verified" },
-  { id: "CERT-DEMO-002", student: "Priya Nair", phone: "9876543211", course: "Physics Mechanics", category: "Physics", issued: "Apr 15, 2026", status: "pending" },
-  { id: "CERT-DEMO-003", student: "Rahul Mehta", phone: "9876543212", course: "Chemistry Fundamentals", category: "Chemistry", issued: "Mar 30, 2026", status: "revoked", revokeReason: "Academic dishonesty" },
+const COURSES_LIST = [
+  "Engineering Mathematics",
+  "Physics Mechanics",
+  "Chemistry Fundamentals",
+  "Computer Science Basics",
+  "Electronics & Circuits",
 ];
 
-const STATUS_COLORS: Record<string, string> = {
-  verified: "badge-green", pending: "badge-amber", revoked: "badge-red",
-};
-const STATUS_ICONS: Record<string, React.ReactNode> = {
-  verified: <CheckCircle size={14} className="text-green-400" />,
-  pending: <Clock size={14} className="text-amber-400" />,
-  revoked: <XCircle size={14} className="text-red-400" />,
+const STUDENTS_LIST = [
+  "Arjun Sharma", "Priya Nair", "Meera Iyer",
+];
+
+const CERTS = [
+  { id: "CERT-2026-001", student: "Arjun Sharma",  phone: "9876543210", course: "Engineering Mathematics", category: "Mathematics", issued: "Apr 20, 2026", status: "verified"  },
+  { id: "CERT-2026-002", student: "Priya Nair",    phone: "9876543211", course: "Physics Mechanics",       category: "Physics",     issued: "Apr 15, 2026", status: "pending"   },
+  { id: "CERT-2026-003", student: "Meera Iyer",    phone: "9876543218", course: "Physics Mechanics",       category: "Physics",     issued: "Mar 18, 2026", status: "verified"  },
+  { id: "CERT-2026-004", student: "Arjun Sharma",  phone: "9876543210", course: "Computer Science Basics", category: "CS",          issued: "Mar 5, 2026",  status: "revoked", revokeReason: "Academic dishonesty" },
+  { id: "CERT-2026-005", student: "Priya Nair",    phone: "9876543211", course: "Chemistry Fundamentals",  category: "Chemistry",   issued: "Feb 28, 2026", status: "pending"   },
+];
+
+type Cert = typeof CERTS[0] & { revokeReason?: string };
+type SortField = "issued" | "student" | "course";
+
+const STATUS_META: Record<string, { label: string; bg: string; color: string; border: string }> = {
+  verified: { label: "Verified",        bg: "rgba(16,185,129,0.10)",  color: "#34D399", border: "rgba(16,185,129,0.25)"  },
+  pending:  { label: "Pending Review",  bg: "rgba(245,158,11,0.10)",  color: "#FBBF24", border: "rgba(245,158,11,0.25)"  },
+  revoked:  { label: "Revoked",         bg: "rgba(239,68,68,0.10)",   color: "#F87171", border: "rgba(239,68,68,0.25)"   },
 };
 
 export default function AdminCertificatesPage() {
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [selected, setSelected] = useState<string[]>([]);
-  const [revokeModal, setRevokeModal] = useState<string | null>(null);
-  const [revokeReason, setRevokeReason] = useState("");
+  const [certs, setCerts]             = useState<Cert[]>(CERTS);
+  const [search, setSearch]           = useState("");
+  const [showFilters, setShowFilters] = useState(true);
+  const [sortField, setSortField]     = useState<SortField>("issued");
+  const [sortDir, setSortDir]         = useState<"asc" | "desc">("desc");
+  const [fStudent, setFStudent]       = useState("All Students");
+  const [fCourse, setFCourse]         = useState("All Courses");
+  const [fStatus, setFStatus]         = useState("All Statuses");
+  const [selected, setSelected]       = useState<string[]>([]);
+
+  // Modals
+  const [revokeModal, setRevokeModal]     = useState<string | null>(null);   // single cert id
   const [bulkRevokeModal, setBulkRevokeModal] = useState(false);
-  const [statusMap, setStatusMap] = useState<Record<string, string>>(
-    Object.fromEntries(CERTS.map(c => [c.id, c.status]))
-  );
-  const [revokeReasons, setRevokeReasons] = useState<Record<string, string>>(
-    Object.fromEntries(CERTS.filter(c => c.revokeReason).map(c => [c.id, c.revokeReason!]))
-  );
+  const [bulkApproveModal, setBulkApproveModal] = useState(false);
+  const [revokeReason, setRevokeReason]   = useState("");
 
-  const filtered = CERTS.filter(c => {
-    const matchSearch = !search || c.student.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search) || c.id.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === "all" || statusMap[c.id] === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  // ── Status helpers ─────────────────────────────────────────────────────────
+  const getStatus = (id: string) => certs.find(c => c.id === id)?.status ?? "pending";
+  const getReason = (id: string) => certs.find(c => c.id === id)?.revokeReason;
 
-  const toggleSelect = (id: string) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
-  const toggleAll = () => setSelected(selected.length === filtered.length ? [] : filtered.map(c => c.id));
+  // ── Filtering + sorting ────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    return certs
+      .filter(c => {
+        if (search && !c.student.toLowerCase().includes(search.toLowerCase()) &&
+            !c.phone.includes(search) && !c.id.toLowerCase().includes(search.toLowerCase()) &&
+            !c.course.toLowerCase().includes(search.toLowerCase())) return false;
+        if (fStudent !== "All Students" && c.student !== fStudent) return false;
+        if (fCourse !== "All Courses"   && c.course   !== fCourse)  return false;
+        if (fStatus !== "All Statuses"  && c.status   !== fStatus.toLowerCase().replace(" ", "_")) {
+          const map: Record<string, string> = { "Verified": "verified", "Pending Review": "pending", "Revoked": "revoked" };
+          if (c.status !== map[fStatus]) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        let val = 0;
+        if (sortField === "student") val = a.student.localeCompare(b.student);
+        else if (sortField === "course") val = a.course.localeCompare(b.course);
+        else val = new Date(a.issued).getTime() - new Date(b.issued).getTime();
+        return sortDir === "asc" ? val : -val;
+      });
+  }, [certs, search, fStudent, fCourse, fStatus, sortField, sortDir]);
+
+  // ── Counts for stat cards ──────────────────────────────────────────────────
+  const counts = useMemo(() => ({
+    total:    certs.length,
+    verified: certs.filter(c => c.status === "verified").length,
+    pending:  certs.filter(c => c.status === "pending").length,
+    revoked:  certs.filter(c => c.status === "revoked").length,
+    students: new Set(certs.map(c => c.student)).size,
+    verifiedPct: certs.length ? Math.round(certs.filter(c => c.status === "verified").length / certs.length * 100) : 0,
+  }), [certs]);
+
+  // ── Selection helpers ──────────────────────────────────────────────────────
+  const toggleSelect  = (id: string) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
+  const toggleAll     = () => setSelected(selected.length === filtered.length ? [] : filtered.map(c => c.id));
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+  const updateCerts = (ids: string[], status: string, reason?: string) => {
+    setCerts(prev => prev.map(c => ids.includes(c.id)
+      ? { ...c, status, revokeReason: status === "revoked" ? reason : undefined }
+      : c
+    ));
+  };
 
   const handleVerify = (id: string) => {
-    setStatusMap(m => ({ ...m, [id]: "verified" }));
-    setRevokeReasons(r => { const next = { ...r }; delete next[id]; return next; });
+    updateCerts([id], "verified");
     toast.success("Certificate verified!");
   };
 
-  const handleRevoke = (id: string) => {
+  const handleRevoke = () => {
     if (!revokeReason.trim()) { toast.error("Please provide a revocation reason"); return; }
-    setStatusMap(m => ({ ...m, [id]: "revoked" }));
-    setRevokeReasons(r => ({ ...r, [id]: revokeReason }));
+    if (revokeModal) {
+      updateCerts([revokeModal], "revoked", revokeReason);
+      toast.success("Certificate revoked");
+    }
     setRevokeModal(null);
     setRevokeReason("");
-    toast.success("Certificate revoked");
   };
 
   const handleRestore = (id: string) => {
-    setStatusMap(m => ({ ...m, [id]: "pending" }));
-    setRevokeReasons(r => { const next = { ...r }; delete next[id]; return next; });
-    toast.success("Certificate restored!");
+    updateCerts([id], "pending");
+    toast.success("Certificate restored to pending!");
   };
 
   const handleBulkVerify = () => {
-    const updates = Object.fromEntries(selected.map(id => [id, "verified"]));
-    setStatusMap(m => ({ ...m, ...updates }));
-    setRevokeReasons(r => {
-      const next = { ...r };
-      selected.forEach(id => delete next[id]);
-      return next;
-    });
+    updateCerts(selected, "verified");
     toast.success(`${selected.length} certificates verified`);
     setSelected([]);
+    setBulkApproveModal(false);
   };
 
   const handleBulkRevoke = () => {
     if (!revokeReason.trim()) { toast.error("Please provide a revocation reason"); return; }
-    const updates = Object.fromEntries(selected.map(id => [id, "revoked"]));
-    const reasons = Object.fromEntries(selected.map(id => [id, revokeReason]));
-    setStatusMap(m => ({ ...m, ...updates }));
-    setRevokeReasons(r => ({ ...r, ...reasons }));
+    updateCerts(selected, "revoked", revokeReason);
     toast.success(`${selected.length} certificates revoked`);
     setSelected([]);
     setBulkRevokeModal(false);
     setRevokeReason("");
   };
 
-  const counts = {
-    total: CERTS.length,
-    verified: Object.values(statusMap).filter(s => s === "verified").length,
-    pending: Object.values(statusMap).filter(s => s === "pending").length,
-    revoked: Object.values(statusMap).filter(s => s === "revoked").length,
+  const handleExportCSV = () => {
+    const rows = [
+      ["Cert #", "Student", "Phone", "Course", "Category", "Issued", "Status", "Revoke Reason"],
+      ...certs.map(c => [c.id, c.student, c.phone, c.course, c.category, c.issued, c.status, c.revokeReason ?? ""]),
+    ];
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a"); a.href = url; a.download = "certificates.csv"; a.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV exported!");
   };
 
+  const cycleSortField = () => {
+    const fields: SortField[] = ["issued", "student", "course"];
+    const next = fields[(fields.indexOf(sortField) + 1) % fields.length];
+    setSortField(next);
+  };
+  const toggleSortDir = () => setSortDir(d => d === "asc" ? "desc" : "asc");
+  const sortLabel = `${sortField === "issued" ? "Newest" : sortField.charAt(0).toUpperCase() + sortField.slice(1)} ${sortDir === "desc" ? "First" : "Last"}`;
+
+  // ── STAT CARDS config ──────────────────────────────────────────────────────
+  const STAT_CARDS = [
+    {
+      label: "TOTAL ISSUED",   value: counts.total,    icon: FileText,      iconBg: "linear-gradient(135deg,#7C3AED,#2563EB)",
+      sub: <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)", display: "flex", alignItems: "center", gap: "4px" }}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        {counts.students} unique students
+      </span>,
+    },
+    {
+      label: "VERIFIED",       value: counts.verified, icon: CheckCircle,   iconBg: "linear-gradient(135deg,#059669,#10B981)",
+      sub: <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <div style={{ flex: 1, height: "4px", borderRadius: "9999px", background: "rgba(255,255,255,0.08)", maxWidth: "80px" }}>
+          <div style={{ height: "100%", borderRadius: "9999px", width: `${counts.verifiedPct}%`, background: "#10B981" }} />
+        </div>
+        <span style={{ fontSize: "11px", color: "#34D399" }}>{counts.verifiedPct}%</span>
+      </div>,
+    },
+    {
+      label: "PENDING REVIEW", value: counts.pending,  icon: Clock,         iconBg: "linear-gradient(135deg,#D97706,#F59E0B)",
+      sub: <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>All reviewed</span>,
+    },
+    {
+      label: "REVOKED",        value: counts.revoked,  icon: XCircle,       iconBg: "linear-gradient(135deg,#BE123C,#E11D48)",
+      sub: <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>Invalidated certificates</span>,
+    },
+  ];
+
+  // ── Status badge renderer ──────────────────────────────────────────────────
+  const StatusBadge = ({ status }: { status: string }) => {
+    const m = STATUS_META[status] ?? STATUS_META.pending;
+    const Icon = status === "verified" ? CheckCircle : status === "revoked" ? XCircle : Clock;
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", padding: "3px 10px", borderRadius: "20px", background: m.bg, color: m.color, border: `1px solid ${m.border}`, fontSize: "12px", fontWeight: 600, whiteSpace: "nowrap" as const }}>
+        <Icon size={11} /> {m.label}
+      </span>
+    );
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 space-y-5 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-white">Certificates</h1><p className="text-white/50 text-sm mt-0.5">{CERTS.length} certificates issued</p></div>
-        <button onClick={() => toast.success("CSV exported!")} className="btn-secondary flex items-center gap-2 px-4 py-2.5 text-sm"><Download size={15} /> Export CSV</button>
+    <div style={{ padding: "28px 24px", maxWidth: "1280px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "24px" }}>
+
+      {/* ── Breadcrumb ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "rgba(255,255,255,0.35)" }}>
+        <span>Dashboard</span>
+        <span>/</span>
+        <span style={{ color: "rgba(255,255,255,0.7)" }}>Certificates</span>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: "Total", value: counts.total, color: "text-purple-400" },
-          { label: "Verified", value: counts.verified, color: "text-green-400" },
-          { label: "Pending", value: counts.pending, color: "text-amber-400" },
-          { label: "Revoked", value: counts.revoked, color: "text-red-400" },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="glass-card p-4"><p className={`text-2xl font-black ${color}`}>{value}</p><p className="text-xs text-white/50">{label}</p></div>
+      {/* ── Header ── */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
+          <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "linear-gradient(135deg,#7C3AED,#2563EB)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: "2px" }}>
+            <Shield size={20} color="#fff" />
+          </div>
+          <div>
+            <h1 style={{ color: "#fff", fontWeight: 800, fontSize: "26px", margin: "0 0 3px", background: "linear-gradient(135deg,#A78BFA,#60A5FA)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Certificate Management</h1>
+            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "14px", margin: 0 }}>Review, verify &amp; manage student certificates</p>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: "10px", flexShrink: 0 }}>
+          <button
+            onClick={handleExportCSV}
+            style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 18px", height: "40px", background: "transparent", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "10px", color: "rgba(255,255,255,0.7)", fontSize: "13px", fontWeight: 600, cursor: "pointer", transition: "all .15s" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.3)"; (e.currentTarget as HTMLButtonElement).style.color = "#fff"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.15)"; (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.7)"; }}
+          >
+            <Download size={14} /> Export CSV
+          </button>
+          <button
+            onClick={() => toast.success("Data refreshed!")}
+            style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 18px", height: "40px", background: "transparent", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "10px", color: "rgba(255,255,255,0.7)", fontSize: "13px", fontWeight: 600, cursor: "pointer", transition: "all .15s" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.3)"; (e.currentTarget as HTMLButtonElement).style.color = "#fff"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.15)"; (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.7)"; }}
+          >
+            <RefreshCw size={14} /> Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* ── Stat cards ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "14px" }}>
+        {STAT_CARDS.map(({ label, value, icon: Icon, iconBg, sub }) => (
+          <div key={label} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "16px", padding: "20px 20px 16px", display: "flex", flexDirection: "column", gap: "10px", position: "relative", overflow: "hidden" }}>
+            {/* faint big icon watermark */}
+            <div style={{ position: "absolute", right: "-8px", top: "-8px", opacity: 0.06 }}>
+              <Icon size={80} color="#fff" />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ width: "34px", height: "34px", borderRadius: "10px", background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Icon size={16} color="#fff" />
+              </div>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.07em", textTransform: "uppercase" as const }}>{label}</span>
+            </div>
+            <p style={{ fontSize: "36px", fontWeight: 900, color: "#fff", margin: "2px 0 0", lineHeight: 1 }}>{value}</p>
+            {sub}
+          </div>
         ))}
       </div>
 
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by student, phone, or cert #..." className="input-field pl-10" />
+      {/* ── Search + Filters + Sort ── */}
+      <div style={{ display: "flex", gap: "10px" }}>
+        <div style={{ position: "relative", flex: 1 }}>
+          <Search size={15} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.35)", pointerEvents: "none" }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by student name, course, or certificate number..."
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: "12px", color: "#fff", padding: "0 16px 0 42px", height: "44px", width: "100%", fontSize: "14px", outline: "none", boxSizing: "border-box" as const }}
+          />
         </div>
-        <div className="flex gap-2">
-          {["all", "verified", "pending", "revoked"].map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)} className={`px-3 py-2 rounded-xl text-xs font-medium transition-all border capitalize ${statusFilter === s ? "bg-purple-600/20 text-purple-400 border-purple-600/30" : "border-white/[0.08] text-white/50 hover:text-white"}`}>
-              {s}
-            </button>
-          ))}
-        </div>
+        <button
+          onClick={() => setShowFilters(v => !v)}
+          style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 18px", height: "44px", background: showFilters ? "rgba(124,58,237,0.18)" : "rgba(255,255,255,0.05)", border: `1px solid ${showFilters ? "rgba(124,58,237,0.5)" : "rgba(255,255,255,0.12)"}`, borderRadius: "12px", color: showFilters ? "#A78BFA" : "#fff", fontSize: "14px", fontWeight: 600, cursor: "pointer", flexShrink: 0, transition: "all .15s" }}
+        >
+          <Filter size={14} /> Filters {showFilters ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </button>
+        <button
+          onClick={() => { cycleSortField(); }}
+          onContextMenu={e => { e.preventDefault(); toggleSortDir(); }}
+          title="Left-click: cycle sort field  |  Right-click: toggle asc/desc"
+          style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 18px", height: "44px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "12px", color: "rgba(255,255,255,0.7)", fontSize: "13px", fontWeight: 600, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" as const, transition: "all .15s" }}
+        >
+          {sortLabel} <ArrowUpDown size={13} />
+        </button>
       </div>
 
-      {/* Bulk bar */}
+      {/* ── Filter panel ── */}
+      {showFilters && (
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "14px", padding: "20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
+            {([
+              { label: "STUDENT", value: fStudent, setter: setFStudent, options: ["All Students", ...STUDENTS_LIST] },
+              { label: "COURSE",  value: fCourse,  setter: setFCourse,  options: ["All Courses",  ...COURSES_LIST]  },
+              { label: "STATUS",  value: fStatus,  setter: setFStatus,  options: ["All Statuses", "Verified", "Pending Review", "Revoked"] },
+            ] as const).map(({ label, value, setter, options }) => (
+              <div key={label}>
+                <p style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", margin: "0 0 8px" }}>{label}</p>
+                <select
+                  value={value}
+                  onChange={e => (setter as (v: string) => void)(e.target.value)}
+                  style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", color: "#fff", padding: "0 14px", height: "40px", fontSize: "13px", outline: "none", cursor: "pointer" }}
+                >
+                  {options.map(o => <option key={o} value={o} style={{ background: "#0D0D1A" }}>{o}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk action bar ── */}
       {selected.length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
-          <span className="text-sm text-white">{selected.length} selected</span>
-          <button onClick={() => setSelected([])} className="text-xs text-white/50 hover:text-white">Clear</button>
-          <div className="ml-auto flex gap-2">
-            <button onClick={handleBulkVerify} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-600/20 text-green-400 border border-green-600/30 text-sm hover:bg-green-600/30 transition-colors">
-              <CheckCircle size={14} /> Verify All
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 18px", background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: "12px" }}>
+          <span style={{ fontSize: "14px", fontWeight: 600, color: "#A78BFA" }}>{selected.length} selected</span>
+          <button onClick={() => setSelected([])} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", fontSize: "12px", padding: 0 }}>Clear</button>
+          <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
+            <button
+              onClick={() => setBulkApproveModal(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: "7px", padding: "0 16px", height: "36px", background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: "10px", color: "#34D399", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            >
+              <CheckCircle size={13} /> Verify All
             </button>
-            <button onClick={() => setBulkRevokeModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600/20 text-red-400 border border-red-600/30 text-sm hover:bg-red-600/30 transition-colors">
-              <XCircle size={14} /> Revoke All
+            <button
+              onClick={() => setBulkRevokeModal(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: "7px", padding: "0 16px", height: "36px", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "10px", color: "#F87171", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            >
+              <XCircle size={13} /> Revoke All
             </button>
           </div>
         </div>
       )}
 
-      {/* Table */}
-      <div className="glass-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/[0.06]">
-                <th className="px-4 py-3 text-left w-10">
-                  <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} className="rounded" />
-                </th>
-                {["Student", "Course", "Cert #", "Issued", "Status", "Actions"].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs text-white/40 font-semibold uppercase tracking-wider">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-white/40 text-sm">No certificates found.</td>
+      {/* ── Table / Empty state ── */}
+      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "16px", overflow: "hidden" }}>
+        {filtered.length === 0 ? (
+          <div style={{ padding: "80px 24px", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+            <div style={{ width: "64px", height: "64px", borderRadius: "16px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Shield size={28} color="rgba(255,255,255,0.2)" />
+            </div>
+            <p style={{ color: "rgba(255,255,255,0.6)", fontWeight: 600, fontSize: "15px", margin: 0 }}>No certificates found</p>
+            <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "13px", margin: 0 }}>Certificates will appear here once students complete courses</p>
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+                  <th style={{ padding: "12px 16px", width: "40px" }}>
+                    <input
+                      type="checkbox"
+                      checked={selected.length === filtered.length && filtered.length > 0}
+                      onChange={toggleAll}
+                      style={{ cursor: "pointer", accentColor: "#7C3AED", width: "15px", height: "15px" }}
+                    />
+                  </th>
+                  {(["Student", "Course", "Cert #", "Issued", "Status", "Actions"] as const).map(h => (
+                    <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.07em", whiteSpace: "nowrap" as const }}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ) : filtered.map(c => {
-                const currentStatus = statusMap[c.id] ?? c.status;
-                const reason = revokeReasons[c.id];
-                return (
-                  <tr key={c.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                    <td className="px-4 py-3">
-                      <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggleSelect(c.id)} className="rounded" />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-                          {c.student[0]}
+              </thead>
+              <tbody>
+                {filtered.map((c, i) => {
+                  const currentStatus = c.status;
+                  return (
+                    <tr
+                      key={c.id}
+                      style={{ borderBottom: i < filtered.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none", transition: "background .12s", background: selected.includes(c.id) ? "rgba(124,58,237,0.05)" : "transparent" }}
+                      onMouseEnter={e => { if (!selected.includes(c.id)) (e.currentTarget as HTMLTableRowElement).style.background = "rgba(255,255,255,0.02)"; }}
+                      onMouseLeave={e => { if (!selected.includes(c.id)) (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}
+                    >
+                      {/* Checkbox */}
+                      <td style={{ padding: "14px 16px" }}>
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(c.id)}
+                          onChange={() => toggleSelect(c.id)}
+                          style={{ cursor: "pointer", accentColor: "#7C3AED", width: "15px", height: "15px" }}
+                        />
+                      </td>
+
+                      {/* Student */}
+                      <td style={{ padding: "14px 16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "11px" }}>
+                          <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: ["linear-gradient(135deg,#7C3AED,#2563EB)", "linear-gradient(135deg,#0891B2,#0D9488)", "linear-gradient(135deg,#D97706,#DC2626)"][parseInt(c.id.slice(-1)) % 3], display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: "13px", flexShrink: 0 }}>
+                            {c.student[0]}
+                          </div>
+                          <div>
+                            <p style={{ color: "#fff", fontWeight: 600, fontSize: "14px", margin: "0 0 2px" }}>{c.student}</p>
+                            <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "12px", margin: 0 }}>{c.phone}</p>
+                          </div>
                         </div>
+                      </td>
+
+                      {/* Course */}
+                      <td style={{ padding: "14px 16px" }}>
+                        <p style={{ color: "rgba(255,255,255,0.8)", fontSize: "13px", fontWeight: 500, margin: "0 0 2px" }}>{c.course}</p>
+                        <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "11px", margin: 0 }}>{c.category}</p>
+                      </td>
+
+                      {/* Cert # */}
+                      <td style={{ padding: "14px 16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <code style={{ fontSize: "12px", color: "#A78BFA", fontFamily: "monospace", background: "rgba(124,58,237,0.1)", padding: "2px 8px", borderRadius: "6px", border: "1px solid rgba(124,58,237,0.2)" }}>{c.id}</code>
+                          <button
+                            onClick={() => { navigator.clipboard.writeText(`/verify/${c.id}`); toast.success("Verification link copied!"); }}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.3)", display: "flex", padding: "2px", transition: "color .12s" }}
+                            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = "#A78BFA"}
+                            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.3)"}
+                          >
+                            <Copy size={12} />
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* Issued */}
+                      <td style={{ padding: "14px 16px", fontSize: "13px", color: "rgba(255,255,255,0.5)", whiteSpace: "nowrap" as const }}>
+                        {c.issued}
+                      </td>
+
+                      {/* Status */}
+                      <td style={{ padding: "14px 16px" }}>
                         <div>
-                          <p className="font-medium text-white">{c.student}</p>
-                          <p className="text-xs text-white/40">{c.phone}</p>
+                          <StatusBadge status={currentStatus} />
+                          {currentStatus === "revoked" && c.revokeReason && (
+                            <p style={{ fontSize: "11px", color: "rgba(248,113,113,0.65)", margin: "4px 0 0", maxWidth: "180px" }}>{c.revokeReason}</p>
+                          )}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-white/80">{c.course}</p>
-                      <p className="text-xs text-white/40">{c.category}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <code className="text-xs text-purple-400 font-mono">{c.id}</code>
-                        <button onClick={() => { navigator.clipboard.writeText(`/verify/${c.id}`); toast.success("Link copied"); }} className="text-white/30 hover:text-white transition-colors">
-                          <Copy size={11} />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-white/50 whitespace-nowrap">{c.issued}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {STATUS_ICONS[currentStatus]}
-                        <span className={`${STATUS_COLORS[currentStatus]} text-xs`}>{currentStatus}</span>
-                      </div>
-                      {reason && <p className="text-[10px] text-red-400/70 mt-0.5">{reason}</p>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {currentStatus !== "verified" && (
-                          <button onClick={() => handleVerify(c.id)} className="text-xs px-2 py-1 rounded-lg bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30 transition-colors">Verify</button>
-                        )}
-                        {currentStatus !== "revoked" && (
-                          <button onClick={() => setRevokeModal(c.id)} className="text-xs px-2 py-1 rounded-lg bg-red-600/20 text-red-400 border border-red-600/30 hover:bg-red-600/30 transition-colors">Revoke</button>
-                        )}
-                        {currentStatus === "revoked" && (
-                          <button onClick={() => handleRestore(c.id)} className="text-xs px-2 py-1 rounded-lg bg-amber-600/20 text-amber-400 border border-amber-600/30 hover:bg-amber-600/30 transition-colors">Restore</button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ padding: "14px 16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" as const }}>
+                          {currentStatus !== "verified" && (
+                            <button
+                              onClick={() => handleVerify(c.id)}
+                              style={{ display: "inline-flex", alignItems: "center", gap: "5px", padding: "0 12px", height: "30px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: "8px", color: "#34D399", fontSize: "12px", fontWeight: 600, cursor: "pointer", transition: "all .12s", whiteSpace: "nowrap" as const }}
+                              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = "rgba(16,185,129,0.18)"}
+                              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "rgba(16,185,129,0.1)"}
+                            >
+                              <CheckCircle size={11} /> Verify
+                            </button>
+                          )}
+                          {currentStatus !== "revoked" && (
+                            <button
+                              onClick={() => setRevokeModal(c.id)}
+                              style={{ display: "inline-flex", alignItems: "center", gap: "5px", padding: "0 12px", height: "30px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "8px", color: "#F87171", fontSize: "12px", fontWeight: 600, cursor: "pointer", transition: "all .12s", whiteSpace: "nowrap" as const }}
+                              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = "rgba(239,68,68,0.18)"}
+                              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "rgba(239,68,68,0.1)"}
+                            >
+                              <XCircle size={11} /> Revoke
+                            </button>
+                          )}
+                          {currentStatus === "revoked" && (
+                            <button
+                              onClick={() => handleRestore(c.id)}
+                              style={{ display: "inline-flex", alignItems: "center", gap: "5px", padding: "0 12px", height: "30px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "8px", color: "#FBBF24", fontSize: "12px", fontWeight: 600, cursor: "pointer", transition: "all .12s", whiteSpace: "nowrap" as const }}
+                              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = "rgba(245,158,11,0.18)"}
+                              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "rgba(245,158,11,0.1)"}
+                            >
+                              <Clock size={11} /> Restore
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Revoke modal */}
+      {/* ── Revoke single modal ── */}
       {revokeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="glass-card p-6 max-w-sm w-full space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-white">Revoke Certificate</h3>
-              <button onClick={() => { setRevokeModal(null); setRevokeReason(""); }} className="text-white/40 hover:text-white"><X size={18} /></button>
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", padding: "16px" }}>
+          <div style={{ background: "#0D0D1A", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "20px", padding: "28px", maxWidth: "400px", width: "100%", display: "flex", flexDirection: "column", gap: "18px" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+              <div>
+                <h3 style={{ color: "#fff", fontWeight: 700, fontSize: "17px", margin: "0 0 4px" }}>Revoke Certificate</h3>
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", margin: 0 }}>
+                  <code style={{ color: "#A78BFA", fontSize: "12px" }}>{revokeModal}</code>
+                </p>
+              </div>
+              <button onClick={() => { setRevokeModal(null); setRevokeReason(""); }} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", display: "flex", padding: "2px" }}>
+                <X size={18} />
+              </button>
             </div>
-            <p className="text-sm text-white/50">Provide a reason for revoking this certificate.</p>
-            <textarea value={revokeReason} onChange={e => setRevokeReason(e.target.value)} rows={3} placeholder="Reason for revocation..." className="input-field resize-none text-sm" />
-            <div className="flex gap-3">
-              <button onClick={() => { setRevokeModal(null); setRevokeReason(""); }} className="btn-secondary flex-1 py-2.5 text-sm">Cancel</button>
-              <button onClick={() => handleRevoke(revokeModal)} className="flex-1 py-2.5 text-sm rounded-xl bg-red-600/20 border border-red-600/30 text-red-400 hover:bg-red-600/30 transition-colors font-semibold">Revoke</button>
+            <div>
+              <label style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", marginBottom: "8px", display: "block" }}>Reason for revocation <span style={{ color: "#F87171" }}>*</span></label>
+              <textarea
+                value={revokeReason}
+                onChange={e => setRevokeReason(e.target.value)}
+                rows={3}
+                placeholder="e.g. Academic dishonesty, data error..."
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", color: "#fff", padding: "12px 14px", width: "100%", fontSize: "13px", outline: "none", resize: "vertical", boxSizing: "border-box" as const }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={() => { setRevokeModal(null); setRevokeReason(""); }} style={{ flex: 1, height: "42px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+              <button onClick={handleRevoke} style={{ flex: 1, height: "42px", borderRadius: "12px", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.35)", color: "#F87171", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>Revoke</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Bulk revoke modal */}
-      {bulkRevokeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="glass-card p-6 max-w-sm w-full space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-white">Bulk Revoke {selected.length} Certificates</h3>
-              <button onClick={() => { setBulkRevokeModal(false); setRevokeReason(""); }} className="text-white/40 hover:text-white"><X size={18} /></button>
+      {/* ── Bulk approve modal ── */}
+      {bulkApproveModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", padding: "16px" }}>
+          <div style={{ background: "#0D0D1A", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "20px", padding: "28px", maxWidth: "400px", width: "100%", display: "flex", flexDirection: "column", gap: "18px" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+              <div>
+                <h3 style={{ color: "#fff", fontWeight: 700, fontSize: "17px", margin: "0 0 4px" }}>Verify {selected.length} Certificates</h3>
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", margin: 0 }}>This will mark all selected certificates as verified.</p>
+              </div>
+              <button onClick={() => setBulkApproveModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", display: "flex", padding: "2px" }}>
+                <X size={18} />
+              </button>
             </div>
-            <textarea value={revokeReason} onChange={e => setRevokeReason(e.target.value)} rows={3} placeholder="Reason for revocation..." className="input-field resize-none text-sm" />
-            <div className="flex gap-3">
-              <button onClick={() => { setBulkRevokeModal(false); setRevokeReason(""); }} className="btn-secondary flex-1 py-2.5 text-sm">Cancel</button>
-              <button onClick={handleBulkRevoke} className="flex-1 py-2.5 text-sm rounded-xl bg-red-600/20 border border-red-600/30 text-red-400 hover:bg-red-600/30 transition-colors font-semibold">Revoke All</button>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={() => setBulkApproveModal(false)} style={{ flex: 1, height: "42px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+              <button onClick={handleBulkVerify} style={{ flex: 1, height: "42px", borderRadius: "12px", background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.35)", color: "#34D399", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>Verify All</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk revoke modal ── */}
+      {bulkRevokeModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", padding: "16px" }}>
+          <div style={{ background: "#0D0D1A", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "20px", padding: "28px", maxWidth: "400px", width: "100%", display: "flex", flexDirection: "column", gap: "18px" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+              <div>
+                <h3 style={{ color: "#fff", fontWeight: 700, fontSize: "17px", margin: "0 0 4px" }}>Bulk Revoke {selected.length} Certificates</h3>
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", margin: 0 }}>Provide a reason that applies to all selected.</p>
+              </div>
+              <button onClick={() => { setBulkRevokeModal(false); setRevokeReason(""); }} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", display: "flex", padding: "2px" }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div>
+              <label style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", marginBottom: "8px", display: "block" }}>Reason for revocation <span style={{ color: "#F87171" }}>*</span></label>
+              <textarea
+                value={revokeReason}
+                onChange={e => setRevokeReason(e.target.value)}
+                rows={3}
+                placeholder="e.g. Batch audit, policy update..."
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", color: "#fff", padding: "12px 14px", width: "100%", fontSize: "13px", outline: "none", resize: "vertical", boxSizing: "border-box" as const }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={() => { setBulkRevokeModal(false); setRevokeReason(""); }} style={{ flex: 1, height: "42px", borderRadius: "12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+              <button onClick={handleBulkRevoke} style={{ flex: 1, height: "42px", borderRadius: "12px", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.35)", color: "#F87171", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>Revoke All</button>
             </div>
           </div>
         </div>

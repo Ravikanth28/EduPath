@@ -25,7 +25,7 @@ type AITool = "quiz" | "notes" | "resources" | "mindmap" | null;
 
 const MOCK_QUIZ = [
   { q: "What is the derivative of sin(x)?", opts: ["cos(x)", "-cos(x)", "tan(x)", "-sin(x)"], correct: 0, exp: "The derivative of sin(x) is cos(x). This is a fundamental trigonometric derivative rule." },
-  { q: "Which rule is used to differentiate a product of two functions?", opts: ["Chain Rule", "Product Rule", "Quotient Rule", "Power Rule"], correct: 1, exp: "The Product Rule: d/dx[uÂ·v] = u'v + uv'. It applies when differentiating the product of two functions." },
+  { q: "Which rule is used to differentiate a product of two functions?", opts: ["Chain Rule", "Product Rule", "Quotient Rule", "Power Rule"], correct: 1, exp: "The Product Rule: d/dx[u·v] = u'v + uv'. It applies when differentiating the product of two functions." },
 ];
 
 export default function CoursePage() {
@@ -133,7 +133,7 @@ export default function CoursePage() {
                           style={{ display: "flex", alignItems: "center", gap: "9px", padding: "8px 10px", borderRadius: "9px", textDecoration: "none", fontSize: "12px", color: mod.testPassed ? "#34D399" : "#A78BFA", background: mod.testPassed ? "rgba(16,185,129,0.06)" : "rgba(124,58,237,0.07)", border: `1px solid ${mod.testPassed ? "rgba(16,185,129,0.2)" : "rgba(124,58,237,0.2)"}` }}
                         >
                           <FileQuestion size={13} />
-                          {mod.testPassed ? `Test Passed â€” ${mod.score}%` : "Take Module Test"}
+                          {mod.testPassed ? `Test Passed — ${mod.score}%` : "Take Module Test"}
                         </Link>
                       )}
                     </div>
@@ -173,7 +173,7 @@ export default function CoursePage() {
                     href={`/dashboard/courses/${params.courseId}/test/${activeModule.id}`}
                     style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "10px 20px", borderRadius: "12px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", color: "#34D399", fontSize: "13px", fontWeight: 700, textDecoration: "none", flexShrink: 0 }}
                   >
-                    <CheckCircle size={15} /> Retake Test â€” {activeModule.score}%
+                    <CheckCircle size={15} /> Retake Test — {activeModule.score}%
                   </Link>
                 )}
               </div>
@@ -255,9 +255,9 @@ export default function CoursePage() {
                     <button onClick={() => setAiTool(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>Close</button>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "14px", fontSize: "14px", color: "rgba(255,255,255,0.7)", lineHeight: "1.7" }}>
-                    <p><strong style={{ color: "#fff" }}>Limits:</strong> A limit describes the value a function approaches as the input approaches a point. Notation: lim(xâ†’a) f(x). L'HÃ´pital's Rule resolves 0/0 or âˆž/âˆž indeterminate forms.</p>
-                    <p><strong style={{ color: "#fff" }}>Derivatives:</strong> The derivative f'(x) = lim(hâ†’0) [f(x+h)-f(x)]/h measures instantaneous rate of change. Key rules: Power, Product, Quotient, and Chain Rule.</p>
-                    <p><strong style={{ color: "#fff" }}>Common Derivatives:</strong> d/dx[xâ¿] = nxâ¿â»Â¹ Â· d/dx[sin x] = cos x Â· d/dx[eË£] = eË£ Â· d/dx[ln x] = 1/x</p>
+                    <p><strong style={{ color: "#fff" }}>Limits:</strong> A limit describes the value a function approaches as the input approaches a point. Notation: lim(x→a) f(x). L'Hôpital's Rule resolves 0/0 or ∞/∞ indeterminate forms.</p>
+                    <p><strong style={{ color: "#fff" }}>Derivatives:</strong> The derivative f'(x) = lim(h→0) [f(x+h)-f(x)]/h measures instantaneous rate of change. Key rules: Power, Product, Quotient, and Chain Rule.</p>
+                    <p><strong style={{ color: "#fff" }}>Common Derivatives:</strong> d/dx[xⁿ] = nxⁿ⁻¹ · d/dx[sin x] = cos x · d/dx[eˣ] = eˣ · d/dx[ln x] = 1/x</p>
                   </div>
                 </div>
               )}
