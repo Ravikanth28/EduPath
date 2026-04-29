@@ -1,7 +1,9 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { PlayCircle, BookOpen, Award, CheckCircle, TrendingUp, Clock, Star } from "lucide-react";
+import { api, type Course } from "@/lib/api";
 
 const testScores = [
   { name: "M1", score: 85 }, { name: "M2", score: 92 }, { name: "M3", score: 78 },
@@ -43,18 +45,25 @@ const cardHover: React.CSSProperties = {
 };
 
 export default function StudentDashboard() {
+  const [courses, setCourses] = useState<Course[]>([]);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const dashboardCourses = courses.length > 0 ? courses.slice(0, 2) : COURSES;
+  const continueCourse = courses.find(c => c.enrolled && !c.completed) ?? courses[0];
+
+  useEffect(() => {
+    api.courses.list().then(setCourses).catch(() => setCourses([]));
+  }, []);
 
   return (
-    <div style={{ padding: "28px 28px 48px", maxWidth: "1200px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "24px" }}>
+    <div className="dash-page-pad">
 
       {/* -- Welcome hero --------------------------------------- */}
-      <div style={{ borderRadius: "20px", padding: "28px 32px", position: "relative", overflow: "hidden", background: "linear-gradient(135deg,#17268F 0%,#2F45D8 55%,#6375FF 100%)", border: "1px solid rgba(255,255,255,0.18)", boxShadow: "0 22px 55px rgba(25,40,150,0.26)" }}>
+      <div className="dash-hero-card" style={{ borderRadius: "20px", padding: "28px 32px", position: "relative", overflow: "hidden", background: "linear-gradient(135deg,#17268F 0%,#2F45D8 55%,#6375FF 100%)", border: "1px solid rgba(255,255,255,0.18)", boxShadow: "0 22px 55px rgba(25,40,150,0.26)" }}>
         <div style={{ position: "absolute", top: "-90px", right: "-70px", width: "340px", height: "340px", background: "radial-gradient(circle,rgba(255,255,255,0.28),transparent 62%)", borderRadius: "50%", filter: "blur(10px)" }} />
         <div style={{ position: "absolute", bottom: "-90px", left: "-60px",  width: "280px", height: "280px", background: "radial-gradient(circle,rgba(255,255,255,0.14),transparent 60%)",  borderRadius: "50%", filter: "blur(10px)" }} />
 
-        <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "20px" }}>
+        <div className="dash-hero-content" style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "20px" }}>
           <div>
             <p style={{ color: "rgba(255,255,255,0.72)", fontSize: "13px", marginBottom: "6px" }}>{greeting},</p>
             <h1 style={{ fontSize: "clamp(22px,3vw,32px)", fontWeight: 800, color: "#FFFFFF", margin: "0 0 8px", letterSpacing: "-0.5px" }}>
@@ -81,7 +90,7 @@ export default function StudentDashboard() {
       </div>
 
       {/* -- Continue learning ---------------------------------- */}
-      <div style={{ borderRadius: "14px", padding: "16px 20px", display: "flex", alignItems: "center", gap: "16px", position: "relative", overflow: "hidden", background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.20)" }}>
+      <div className="dash-continue-card" style={{ borderRadius: "14px", padding: "16px 20px", display: "flex", alignItems: "center", gap: "16px", position: "relative", overflow: "hidden", background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.20)" }}>
         <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "rgba(124,58,237,0.18)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <PlayCircle size={20} color="#A78BFA" />
         </div>
@@ -90,16 +99,16 @@ export default function StudentDashboard() {
           <p style={{ color: "#fff", fontWeight: 700, fontSize: "15px", marginBottom: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Engineering Mathematics</p>
           <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)" }}>Module 4 of 6</p>
         </div>
-        <Link href="/dashboard/courses/1" style={{ flexShrink: 0, padding: "10px 20px", background: "linear-gradient(135deg,#7C3AED,#5B21B6)", color: "#FFFFFF", borderRadius: "10px", fontSize: "13px", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", gap: "7px" }}>
+        <Link href={continueCourse ? `/dashboard/courses/${continueCourse.id}` : "/dashboard/courses"} className="dash-resume-button" style={{ flexShrink: 0, padding: "10px 20px", background: "linear-gradient(135deg,#7C3AED,#5B21B6)", color: "#FFFFFF", borderRadius: "10px", fontSize: "13px", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", gap: "7px" }}>
           <PlayCircle size={14} /> Resume
         </Link>
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(135deg,#7C3AED,#A78BFA)", width: "65%" }} />
       </div>
 
       {/* -- Stats row ------------------------------------------ */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "14px" }}>
+      <div className="dash-stats-grid">
         {STATS.map(({ icon: Icon, label, value, accent, bg }) => (
-          <div key={label} style={{ ...card, padding: "20px", display: "flex", alignItems: "center", gap: "14px" }}>
+          <div className="dash-stat-card" key={label} style={{ ...card, padding: "20px", display: "flex", alignItems: "center", gap: "14px" }}>
             <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Icon size={20} color={accent} />
             </div>
@@ -112,7 +121,7 @@ export default function StudentDashboard() {
       </div>
 
       {/* -- Analytics ------------------------------------------ */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+      <div className="dash-two-col">
         {/* Bar chart */}
         <div style={{ ...card, padding: "22px" }}>
           <p style={{ fontWeight: 700, color: "#fff", fontSize: "14px", marginBottom: "18px" }}>Test Scores by Module</p>
@@ -167,31 +176,35 @@ export default function StudentDashboard() {
           <h2 style={{ fontWeight: 800, color: "#fff", fontSize: "17px", margin: 0 }}>My Courses</h2>
           <Link href="/dashboard/courses" style={{ fontSize: "13px", color: "#A78BFA", textDecoration: "none", fontWeight: 600 }}>View All &gt;</Link>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-          {COURSES.map(c => (
+        <div className="dash-courses-grid">
+          {dashboardCourses.map(c => {
+            const completed = "status" in c ? c.status === "completed" : Boolean(c.completed);
+            const progress = c.progress ?? 0;
+            return (
             <div key={c.id} style={{ ...cardHover, overflow: "hidden" }}>
               <div style={{ height: "4px", background: "linear-gradient(135deg,#7C3AED,#06B6D4)" }} />
               <div style={{ padding: "18px 20px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
                   <span style={{ fontSize: "11px", fontWeight: 700, color: "#A78BFA", background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: "20px", padding: "2px 10px" }}>{c.category}</span>
-                  {c.status === "completed"
+                  {completed
                     ? <span style={{ fontSize: "11px", fontWeight: 700, color: "#4ADE80", background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: "20px", padding: "2px 10px" }}>Done</span>
-                    : <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.55)", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "20px", padding: "2px 10px" }}>{c.progress}%</span>
+                    : <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.55)", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "20px", padding: "2px 10px" }}>{progress}%</span>
                   }
                 </div>
                 <p style={{ fontWeight: 700, color: "#fff", fontSize: "15px", marginBottom: "12px" }}>{c.title}</p>
                 <div style={{ height: "5px", borderRadius: "99px", background: "rgba(255,255,255,0.06)", marginBottom: "12px", overflow: "hidden" }}>
-                  <div style={{ height: "100%", borderRadius: "99px", width: `${c.progress}%`, background: "linear-gradient(135deg,#7C3AED,#A78BFA)" }} />
+                  <div style={{ height: "100%", borderRadius: "99px", width: `${progress}%`, background: "linear-gradient(135deg,#7C3AED,#A78BFA)" }} />
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)" }}>{c.modules} modules</span>
                   <Link href={`/dashboard/courses/${c.id}`} style={{ fontSize: "12px", color: "#A78BFA", textDecoration: "none", fontWeight: 600 }}>
-                    {c.status === "completed" ? "Review" : "Continue"} &gt;
+                    {completed ? "Review" : "Continue"} &gt;
                   </Link>
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

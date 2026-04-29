@@ -451,7 +451,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
 
         role="student",
 
-        verified=False,
+        verified=True,
 
         joined_at=datetime.utcnow().strftime("%B %d, %Y"),
 
@@ -467,13 +467,12 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
 
 
 
-    otp = str(random.randint(100000, 999999))
+    db.add(ActivityLog(student_name=user.name, detail="Registered account"))
+    db.commit()
 
-    otp_store[data.email] = otp
+    token = create_access_token({"sub": user.email, "role": user.role})
 
-    print(f"[DEV] OTP for {data.email}: {otp}")
-
-    return {"message": "Registration successful. OTP sent."}
+    return {"access_token": token, "token_type": "bearer", "role": user.role, "name": user.name}
 
 
 
