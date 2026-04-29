@@ -90,6 +90,7 @@ export interface LeaderboardEntry {
   courses_completed: number;
   certificates: number;
   is_current_user?: boolean;
+  badge?: string;
 }
 
 export interface ModuleVideo {
@@ -194,7 +195,7 @@ export const api = {
   /** Auth */
   auth: {
     register: (data: { name: string; email: string; password: string; phone: string }) =>
-      request<{ message: string }>("/auth/register", {
+      request<AuthResponse>("/auth/register", {
         method: "POST",
         body: JSON.stringify(data),
       }),

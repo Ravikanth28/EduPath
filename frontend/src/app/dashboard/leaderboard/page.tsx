@@ -61,7 +61,7 @@ export default function LeaderboardPage() {
     color: "rgba(255,255,255,0.6)", flexShrink: 0,
   };
 
-  const podiumPerson = (entry: LeaderboardEntry, avatarSize: number, platformH: number, platformBg: string, medalColor: string, isFirst: boolean) => (
+  const podiumPerson = (entry: DisplayEntry, avatarSize: number, platformH: number, platformBg: string, medalColor: string, isFirst: boolean) => (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
       {isFirst && <Crown size={28} color="#FBBF24" style={{ filter: "drop-shadow(0 0 8px #FBBF24)" }} />}
       <div style={{

@@ -15,6 +15,7 @@ export default function CoursePage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [expandedModule, setExpandedModule] = useState<string | null>(null);
   const [currentVideo, setCurrentVideo] = useState<{ moduleId: string; index: number } | null>(null);
   const [aiTool, setAiTool] = useState<AITool>(null);
@@ -38,10 +39,15 @@ export default function CoursePage() {
 
   useEffect(() => {
     setLoading(true);
+    setError("");
     api.courses.get(courseId)
       .then(async data => {
         setCourse(data);
         await refreshModules(courseId);
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Course not found");
+        setCourse(null);
       })
       .finally(() => setLoading(false));
   }, [courseId]);
@@ -113,10 +119,23 @@ export default function CoursePage() {
     { key: "mindmap"   as AITool, label: "Mind Map",      icon: Network,  color: "#111322", bg: "rgba(106,112,133,0.1)", border: "rgba(106,112,133,0.3)" },
   ];
 
-  if (loading || !course) {
+  if (loading) {
     return (
       <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg,#DDE7FF 0%,#EEF3FF 52%,#CAD8FF 100%)" }}>
         <div style={{ width: "32px", height: "32px", border: "3px solid rgba(47,69,216,0.25)", borderTopColor: "#2F45D8", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      </div>
+    );
+  }
+
+  if (!course) {
+    return (
+      <div style={{ minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", background: "linear-gradient(135deg,#DDE7FF 0%,#EEF3FF 52%,#CAD8FF 100%)" }}>
+        <div style={{ width: "100%", maxWidth: "420px", background: "#FFFFFF", border: "1px solid rgba(47,69,216,0.12)", borderRadius: "18px", padding: "28px", textAlign: "center", boxShadow: "0 12px 40px rgba(47,69,216,0.12)" }}>
+          <BookOpen size={36} color="#2F45D8" style={{ margin: "0 auto 12px" }} />
+          <h1 style={{ fontSize: "22px", fontWeight: 800, color: "#111322", margin: "0 0 8px" }}>{error || "Course not found"}</h1>
+          <p style={{ fontSize: "14px", color: "rgba(17,19,34,0.55)", margin: "0 0 20px" }}>This course may have been removed or the link may be outdated.</p>
+          <Link href="/dashboard/courses" className="btn-primary" style={{ textDecoration: "none" }}>Browse Courses</Link>
+        </div>
       </div>
     );
   }

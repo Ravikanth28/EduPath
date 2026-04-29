@@ -39,12 +39,21 @@ async function downloadCertAsPDF(studentName: string, courseName: string, issued
   img.src = "/cert-bg.jpeg";
   await new Promise<void>(resolve => { img.onload = () => resolve(); });
   doc.addImage(img, "JPEG", 0, 0, W, H);
+  const logo = new Image();
+  logo.src = "/smvec-logo.png";
+  await new Promise<void>(resolve => { logo.onload = () => resolve(); });
 
   // White area horizontal center (medal takes left ~17%): center at 57% of W
   const CX = W * 0.57;
 
   // "This is to certify that" — italic, gray
   doc.setFillColor(255, 255, 255);
+  doc.rect(W * 0.18, H * 0.025, W * 0.80, H * 0.09, "F");
+  doc.addImage(logo, "PNG", W * 0.205, H * 0.03, W * 0.052, H * 0.078);
+  doc.setFont("times", "normal");
+  doc.setFontSize(15);
+  doc.setTextColor(174, 130, 42);
+  doc.text("SRI MANAKULA VINAYAGAR ENGINEERING COLLEGE", W * 0.605, H * 0.075, { align: "center" });
   doc.rect(W * 0.20, H * 0.305, W * 0.80, H * 0.19, "F");
   doc.rect(W * 0.20, H * 0.50, W * 0.80, H * 0.035, "F");
 
@@ -223,6 +232,13 @@ export default function CertificatesPage() {
             {/* cert-bg.jpeg has "THIS CERTIFICATE IS PRESENTED TO" baked at y≈33-43% — masked with white */}
             <div style={{ position: "relative", borderRadius: "10px", overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.75)", containerType: "inline-size" }}>
               <img src="/cert-bg.jpeg" alt="certificate" style={{ width: "100%", display: "block" }} />
+              <div style={{ position: "absolute", top: "2.5%", left: "18%", right: "2%", height: "9.5%", background: "white", pointerEvents: "none" }} />
+              <img src="/smvec-logo.png" alt="" style={{ position: "absolute", top: "3.1%", left: "20.5%", width: "5.4%", height: "auto", pointerEvents: "none" }} />
+              <div style={{ position: "absolute", top: "5.3%", left: "27%", right: "5%", textAlign: "center", pointerEvents: "none" }}>
+                <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontSize: "clamp(9px, 2.2cqw, 23px)", color: "#AE822A", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
+                  SRI MANAKULA VINAYAGAR ENGINEERING COLLEGE
+                </span>
+              </div>
 
               {/* WHITE MASK — covers the pre-printed "THIS CERTIFICATE IS PRESENTED TO" text */}
               <div style={{ position: "absolute", top: "31%", left: "20%", right: "1%", height: "12%", background: "white", pointerEvents: "none" }} />

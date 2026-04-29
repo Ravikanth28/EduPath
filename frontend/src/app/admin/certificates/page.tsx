@@ -169,7 +169,7 @@ export default function AdminCertificatesPage() {
       </span>,
     },
     {
-    { label: "VERIFIED",       value: counts.verified, icon: CheckCircle,   iconBg: "rgba(74,222,128,0.18)",
+      label: "VERIFIED",       value: counts.verified, icon: CheckCircle,   iconBg: "rgba(74,222,128,0.18)",
       sub: <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
         <div style={{ flex: 1, height: "4px", borderRadius: "9999px", background: "rgba(255,255,255,0.08)", maxWidth: "80px" }}>
           <div style={{ height: "100%", borderRadius: "9999px", width: `${counts.verifiedPct}%`, background: "#4ADE80" }} />
