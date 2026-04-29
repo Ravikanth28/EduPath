@@ -95,7 +95,7 @@ def startup() -> None:
 
 # -----------------------------------------------------
 
-SECRET_KEY = os.getenv("SECRET_KEY", "change-this-secret-in-production")
+SECRET_KEY = os.getenv("SECRET_KEY", "edupath-jwt-secret-k9x2mL8pQr4nVwZ7yT1uA3bC6dE0fG5h")
 
 ALGORITHM = "HS256"
 

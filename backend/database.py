@@ -24,14 +24,16 @@ _raw = os.getenv("TIDB_CONNECTION_STRING", "")
 if not _raw:
     raise RuntimeError("TIDB_CONNECTION_STRING is not set in .env")
 
-DB_NAME = os.getenv("TIDB_DB_NAME", "edupath")
+# Extract DB name directly from the connection string (e.g. .../edupath)
+_db_match = re.search(r"/([^/?]+)(?:\?|$)", _raw)
+DB_NAME = _db_match.group(1) if _db_match else "edupath"
 
 # Convert  mysql://  →  mysql+pymysql://
 _url = re.sub(r"^mysql://", "mysql+pymysql://", _raw)
 
-# Build base URL (sys) and target URL (edupath)
-_base_url    = re.sub(r"/([^/?]+)$", "/sys",     _url)
-DATABASE_URL = re.sub(r"/([^/?]+)$", f"/{DB_NAME}", _url)
+# Build base URL (sys) and target URL
+_base_url    = re.sub(r"/([^/?]+)(\?|$)", r"/sys\2",         _url)
+DATABASE_URL = re.sub(r"/([^/?]+)(\?|$)", f"/{DB_NAME}\\2",  _url)
 
 # TiDB Cloud requires SSL; certifi provides a cross-platform CA bundle
 _SSL = {
