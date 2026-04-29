@@ -82,6 +82,7 @@ export interface LeaderboardEntry {
   points: number;
   courses_completed: number;
   certificates: number;
+  badge?: string;
   is_current_user?: boolean;
 }
 
