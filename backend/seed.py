@@ -133,26 +133,32 @@ def seed() -> None:
 
         # ── Certificates ──────────────────────────────────────────────────────
         certificates = [
-            Certificate(id="CERT-DEMO-001", course_name="Physics Mechanics",       category="Physics",
+            Certificate(id="CERT-DEMO-001", course_name="Engineering Mathematics", category="Mathematics",
                         student_id=arjun_id, issued_date="March 15, 2026",  status="verified",
-                        grad="linear-gradient(90deg,#0891B2,#0D9488)", accent="#0891B2",
-                        accent_dim="rgba(8,145,178,0.12)", accent_border="rgba(8,145,178,0.3)"),
+                        grad="linear-gradient(90deg,#7C3AED,#2563EB)", accent="#7C3AED",
+                        accent_dim="rgba(124,58,237,0.12)", accent_border="rgba(124,58,237,0.3)"),
 
             Certificate(id="CERT-DEMO-002", course_name="Physics Mechanics",       category="Physics",
-                        student_id=priya_id, issued_date="March 20, 2026",  status="verified",
+                        student_id=arjun_id, issued_date="March 20, 2026",  status="verified",
                         grad="linear-gradient(90deg,#0891B2,#0D9488)", accent="#0891B2",
                         accent_dim="rgba(8,145,178,0.12)", accent_border="rgba(8,145,178,0.3)"),
 
-            Certificate(id="CERT-DEMO-003", course_name="Engineering Mathematics", category="Mathematics",
-                        student_id=arjun_id, issued_date="April 20, 2026",  status="pending",
-                        grad="linear-gradient(90deg,#7C3AED,#2563EB)", accent="#7C3AED",
-                        accent_dim="rgba(124,58,237,0.12)", accent_border="rgba(124,58,237,0.3)"),
+            Certificate(id="CERT-DEMO-003", course_name="Chemistry Fundamentals",  category="Chemistry",
+                        student_id=arjun_id, issued_date="April 05, 2026",  status="verified",
+                        grad="linear-gradient(90deg,#EA580C,#DC2626)", accent="#EA580C",
+                        accent_dim="rgba(234,88,12,0.12)", accent_border="rgba(234,88,12,0.3)"),
 
-            Certificate(id="CERT-DEMO-004", course_name="Engineering Mathematics", category="Mathematics",
-                        student_id=rahul_id, issued_date="April 22, 2026",  status="verified",
-                        grad="linear-gradient(90deg,#7C3AED,#2563EB)", accent="#7C3AED",
-                        accent_dim="rgba(124,58,237,0.12)", accent_border="rgba(124,58,237,0.3)"),
+            Certificate(id="CERT-DEMO-004", course_name="Computer Science Basics", category="Computer Science",
+                        student_id=arjun_id, issued_date="April 15, 2026",  status="verified",
+                        grad="linear-gradient(90deg,#16A34A,#059669)", accent="#16A34A",
+                        accent_dim="rgba(22,163,74,0.12)", accent_border="rgba(22,163,74,0.3)"),
+
+            Certificate(id="CERT-DEMO-005", course_name="Electronics & Circuits",  category="Electronics",
+                        student_id=arjun_id, issued_date="April 25, 2026",  status="verified",
+                        grad="linear-gradient(90deg,#DB2777,#E11D48)", accent="#DB2777",
+                        accent_dim="rgba(219,39,119,0.12)", accent_border="rgba(219,39,119,0.3)"),
         ]
+
         db.add_all(certificates)
         db.flush()
         print("  ✓ Certificates inserted")
