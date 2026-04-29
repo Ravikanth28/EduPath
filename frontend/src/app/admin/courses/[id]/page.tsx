@@ -2,9 +2,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronUp, Video, HelpCircle, Plus, Trash2, Save, Link2, CheckCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Video, HelpCircle, Plus, Trash2, Save, Link2, CheckCircle, Loader2, Upload } from "lucide-react";
 import toast from "react-hot-toast";
-import { api, type AdminModule, type AdminVideo, type AdminQuestion, type Course } from "@/lib/api";
+import { api, DEFAULT_MODULE_SETTINGS, type AdminModule, type AdminVideo, type AdminQuestion, type Course } from "@/lib/api";
 
 // ── Style constants ──────────────────────────────────────────────────────────
 const BG      = "#06060F";
@@ -136,13 +136,81 @@ function VideosPanel({ courseId, module }: { courseId: string; module: AdminModu
 }
 
 type QDraft = { q: string; opts: string[]; correct: number; exp: string };
+type ModuleSettings = Pick<AdminModule, "pass_percentage" | "questions_per_test" | "shuffle_questions" | "show_explanations">;
 function emptyQ(): QDraft { return { q: "", opts: ["", "", "", ""], correct: 0, exp: "" }; }
 
-function QuestionsPanel({ courseId, module }: { courseId: string; module: AdminModule }) {
+function getModuleSettings(module: AdminModule): ModuleSettings {
+  return {
+    pass_percentage: module.pass_percentage ?? DEFAULT_MODULE_SETTINGS.pass_percentage,
+    questions_per_test: module.questions_per_test ?? DEFAULT_MODULE_SETTINGS.questions_per_test,
+    shuffle_questions: module.shuffle_questions ?? DEFAULT_MODULE_SETTINGS.shuffle_questions,
+    show_explanations: module.show_explanations ?? DEFAULT_MODULE_SETTINGS.show_explanations,
+  };
+}
+
+function parseCSVRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (char === "\"" && quoted && next === "\"") {
+      cell += "\"";
+      i += 1;
+    } else if (char === "\"") {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell.trim());
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") i += 1;
+      row.push(cell.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+
+  row.push(cell.trim());
+  if (row.some(Boolean)) rows.push(row);
+  return rows;
+}
+
+function parseQuestionsCSV(text: string): QDraft[] {
+  const rows = parseCSVRows(text);
+  const dataRows = rows[0]?.[0]?.trim().toLowerCase() === "question" ? rows.slice(1) : rows;
+
+  return dataRows.flatMap(cols => {
+    if (cols.length < 6) return [];
+    const correct = ["A", "B", "C", "D"].indexOf(cols[5].trim().toUpperCase());
+    if (!cols[0] || cols.slice(1, 5).some(c => !c) || correct < 0) return [];
+    return [{ q: cols[0], opts: [cols[1], cols[2], cols[3], cols[4]], correct, exp: cols[6] || "" }];
+  });
+}
+
+function QuestionsPanel({
+  courseId,
+  module,
+  onQuestionsChange,
+  onSettingsChange,
+}: {
+  courseId: string;
+  module: AdminModule;
+  onQuestionsChange: (moduleNum: number, questions: AdminQuestion[]) => void;
+  onSettingsChange: (moduleNum: number, settings: ModuleSettings) => void;
+}) {
   const [qTab, setQTab] = useState<QTab>("manual");
   const [saved, setSaved] = useState<AdminQuestion[]>(module.questions);
+  const [settings, setSettings] = useState<ModuleSettings>(getModuleSettings(module));
   const [drafts, setDrafts] = useState<QDraft[]>([emptyQ()]);
   const [csvText, setCsvText] = useState("");
+  const [csvFileName, setCsvFileName] = useState("");
   const [saving, setSaving] = useState(false);
 
   const setDraftField = (i: number, field: keyof QDraft, val: string | number | string[]) =>
@@ -159,20 +227,16 @@ function QuestionsPanel({ courseId, module }: { courseId: string; module: AdminM
     try {
       await api.modules.saveQuestions(courseId, module.num, all);
       toast.success(`${valid.length} question(s) saved!`);
-      setSaved([...saved, ...valid.map((q, i) => ({ idx: saved.length + i + 1, ...q }))]);
+      const nextSaved = [...saved, ...valid.map((q, i) => ({ idx: saved.length + i + 1, ...q }))];
+      setSaved(nextSaved);
+      onQuestionsChange(module.num, nextSaved);
       setDrafts([emptyQ()]);
     } catch { toast.error("Failed to save questions"); }
     finally { setSaving(false); }
   };
 
   const saveCSV = async () => {
-    const lines = csvText.trim().split("\n").filter(Boolean);
-    const parsed: QDraft[] = [];
-    for (const line of lines) {
-      const cols = line.split(",").map(c => c.trim().replace(/^"|"$/g, ""));
-      if (cols.length < 6) continue;
-      parsed.push({ q: cols[0], opts: [cols[1], cols[2], cols[3], cols[4]], correct: ["A","B","C","D"].indexOf(cols[5].toUpperCase()), exp: cols[6] || "" });
-    }
+    const parsed = parseQuestionsCSV(csvText);
     if (!parsed.length) { toast.error("No valid rows found"); return; }
     const all = [
       ...saved.map(q => ({ q: q.q, opts: q.opts, correct: q.correct, exp: q.exp || "" })),
@@ -182,9 +246,61 @@ function QuestionsPanel({ courseId, module }: { courseId: string; module: AdminM
     try {
       await api.modules.saveQuestions(courseId, module.num, all);
       toast.success(`${parsed.length} questions imported!`);
-      setSaved([...saved, ...parsed.map((q, i) => ({ idx: saved.length + i + 1, ...q }))]);
+      const nextSaved = [...saved, ...parsed.map((q, i) => ({ idx: saved.length + i + 1, ...q }))];
+      setSaved(nextSaved);
+      onQuestionsChange(module.num, nextSaved);
       setCsvText("");
+      setCsvFileName("");
     } catch { toast.error("Failed to import questions"); }
+    finally { setSaving(false); }
+  };
+
+  const deleteQuestion = async (idx: number) => {
+    const nextSaved = saved.filter(q => q.idx !== idx).map((q, i) => ({ ...q, idx: i + 1 }));
+    const nextPayload = nextSaved.map(q => ({ q: q.q, opts: q.opts, correct: q.correct, exp: q.exp || "" }));
+    setSaving(true);
+    try {
+      await api.modules.saveQuestions(courseId, module.num, nextPayload);
+      setSaved(nextSaved);
+      onQuestionsChange(module.num, nextSaved);
+      toast.success("Question removed");
+    } catch { toast.error("Failed to remove question"); }
+    finally { setSaving(false); }
+  };
+
+  const handleCSVFile = async (file: File | null) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      toast.error("Please upload a CSV file");
+      return;
+    }
+    setCsvFileName(file.name);
+    setCsvText(await file.text());
+  };
+
+  const updateSetting = <K extends keyof ModuleSettings>(key: K, value: ModuleSettings[K]) => {
+    setSettings(current => ({ ...current, [key]: value }));
+  };
+
+  const saveSettings = async () => {
+    const nextSettings = {
+      ...settings,
+      pass_percentage: Math.max(1, Math.min(100, Number(settings.pass_percentage) || 70)),
+      questions_per_test: Math.max(0, Number(settings.questions_per_test) || 0),
+    };
+    setSaving(true);
+    try {
+      const savedSettings = await api.modules.saveSettings(courseId, module.num, nextSettings);
+      const normalized = {
+        pass_percentage: savedSettings.pass_percentage ?? DEFAULT_MODULE_SETTINGS.pass_percentage,
+        questions_per_test: savedSettings.questions_per_test ?? DEFAULT_MODULE_SETTINGS.questions_per_test,
+        shuffle_questions: savedSettings.shuffle_questions ?? DEFAULT_MODULE_SETTINGS.shuffle_questions,
+        show_explanations: savedSettings.show_explanations ?? DEFAULT_MODULE_SETTINGS.show_explanations,
+      };
+      setSettings(normalized);
+      onSettingsChange(module.num, normalized);
+      toast.success("Settings saved");
+    } catch { toast.error("Failed to save settings"); }
     finally { setSaving(false); }
   };
 
@@ -202,6 +318,27 @@ function QuestionsPanel({ courseId, module }: { courseId: string; module: AdminM
 
       {qTab === "manual" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {saved.length > 0 && (
+            <div>
+              <p style={{ fontSize: "11px", letterSpacing: "0.08em", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", marginBottom: "10px" }}>Saved Questions</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {saved.map(q => (
+                  <div key={q.idx} style={{ display: "flex", alignItems: "center", gap: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "10px 12px" }}>
+                    <span style={{ fontSize: "11px", padding: "2px 10px", borderRadius: "20px", background: "rgba(124,58,237,0.2)", color: "#A78BFA", fontWeight: 700, flexShrink: 0 }}>Q{q.idx}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ color: "#fff", fontSize: "13px", fontWeight: 600, margin: "0 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{q.q}</p>
+                      <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "11px", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        Answer: {["A", "B", "C", "D"][q.correct]} - {q.opts[q.correct]}
+                      </p>
+                    </div>
+                    <button onClick={() => deleteQuestion(q.idx)} disabled={saving} style={{ background: "none", border: "none", cursor: saving ? "default" : "pointer", color: "rgba(239,68,68,0.6)", padding: "4px", display: "flex", flexShrink: 0, opacity: saving ? 0.6 : 1 }}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {drafts.map((d, i) => (
             <div key={i} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -248,6 +385,11 @@ function QuestionsPanel({ courseId, module }: { courseId: string; module: AdminM
             <p style={{ color: "#fff", fontSize: "13px", fontWeight: 600, marginBottom: "8px" }}>CSV Format</p>
             <pre style={{ fontSize: "11px", color: "#67E8F9", background: "rgba(0,0,0,0.3)", borderRadius: "8px", padding: "10px", margin: 0, overflowX: "auto", lineHeight: 1.7, fontFamily: "monospace" }}>{`question,optionA,optionB,optionC,optionD,correct,explanation\nWhat is a derivative?,Rate of change,Area,Vector,Matrix rank,A,Measures rate`}</pre>
           </div>
+          <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", minHeight: "48px", borderRadius: "10px", border: "1px dashed rgba(124,58,237,0.45)", background: "rgba(124,58,237,0.08)", color: "#C4B5FD", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>
+            <Upload size={15} />
+            {csvFileName ? csvFileName : "Upload CSV file"}
+            <input type="file" accept=".csv,text/csv" onChange={e => handleCSVFile(e.target.files?.[0] ?? null)} style={{ display: "none" }} />
+          </label>
           <textarea value={csvText} onChange={e => setCsvText(e.target.value)} placeholder="Paste CSV content here..." rows={7} style={{ ...INPUT_S, resize: "vertical", fontFamily: "monospace", fontSize: "12px" }} onFocus={focus} onBlur={blur} />
           <button onClick={saveCSV} disabled={saving} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "linear-gradient(135deg,#7C3AED,#6D28D9)", borderRadius: "10px", color: "#fff", fontSize: "13px", fontWeight: 700, border: "none", cursor: "pointer", boxShadow: "0 2px 16px rgba(124,58,237,0.35)", width: "fit-content", opacity: saving ? 0.7 : 1 }}>
             {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Save size={14} />} Import Questions
@@ -256,8 +398,49 @@ function QuestionsPanel({ courseId, module }: { courseId: string; module: AdminM
       )}
 
       {qTab === "settings" && (
-        <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "16px" }}>
-          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", margin: 0 }}>Pass percentage and questions-per-test settings coming soon.</p>
+        <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "16px", display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "6px", color: "rgba(255,255,255,0.5)", fontSize: "12px", fontWeight: 600 }}>
+              Pass percentage
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={settings.pass_percentage}
+                onChange={e => updateSetting("pass_percentage", Number(e.target.value))}
+                style={INPUT_S}
+                onFocus={focus}
+                onBlur={blur}
+              />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: "6px", color: "rgba(255,255,255,0.5)", fontSize: "12px", fontWeight: 600 }}>
+              Questions per test
+              <input
+                type="number"
+                min={0}
+                max={saved.length || undefined}
+                value={settings.questions_per_test}
+                onChange={e => updateSetting("questions_per_test", Number(e.target.value))}
+                style={INPUT_S}
+                onFocus={focus}
+                onBlur={blur}
+              />
+            </label>
+          </div>
+          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", color: "rgba(255,255,255,0.72)", fontSize: "13px", fontWeight: 600, padding: "12px 14px", background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px" }}>
+            Shuffle questions for each test
+            <input type="checkbox" checked={settings.shuffle_questions} onChange={e => updateSetting("shuffle_questions", e.target.checked)} style={{ width: "18px", height: "18px", accentColor: "#7C3AED" }} />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", color: "rgba(255,255,255,0.72)", fontSize: "13px", fontWeight: 600, padding: "12px 14px", background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px" }}>
+            Show explanations after submit
+            <input type="checkbox" checked={settings.show_explanations} onChange={e => updateSetting("show_explanations", e.target.checked)} style={{ width: "18px", height: "18px", accentColor: "#7C3AED" }} />
+          </label>
+          <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "12px", lineHeight: 1.5, margin: 0 }}>
+            Set questions per test to 0 to use all saved questions.
+          </p>
+          <button onClick={saveSettings} disabled={saving} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "linear-gradient(135deg,#7C3AED,#6D28D9)", borderRadius: "10px", color: "#fff", fontSize: "13px", fontWeight: 700, border: "none", cursor: "pointer", boxShadow: "0 2px 16px rgba(124,58,237,0.35)", width: "fit-content", opacity: saving ? 0.7 : 1 }}>
+            {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Save size={14} />} Save Settings
+          </button>
         </div>
       )}
     </div>
@@ -283,6 +466,19 @@ export default function CourseManagePage() {
     }).catch(() => toast.error("Failed to load course"))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const updateModuleQuestions = (moduleNum: number, questions: AdminQuestion[]) => {
+    setModules(current => {
+      const next = current.map(mod => mod.num === moduleNum ? { ...mod, questions } : mod);
+      const quizCount = next.reduce((total, mod) => total + mod.questions.length, 0);
+      setCourse(courseCurrent => courseCurrent ? { ...courseCurrent, quizzes: quizCount } : courseCurrent);
+      return next;
+    });
+  };
+
+  const updateModuleSettings = (moduleNum: number, settings: ModuleSettings) => {
+    setModules(current => current.map(mod => mod.num === moduleNum ? { ...mod, ...settings } : mod));
+  };
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -350,7 +546,7 @@ export default function CourseManagePage() {
                     <div style={{ padding: "20px 18px" }}>
                       {tab === "videos"
                         ? <VideosPanel courseId={id as string} module={mod} />
-                        : <QuestionsPanel courseId={id as string} module={mod} />}
+                        : <QuestionsPanel courseId={id as string} module={mod} onQuestionsChange={updateModuleQuestions} onSettingsChange={updateModuleSettings} />}
                     </div>
                   </div>
                 )}
