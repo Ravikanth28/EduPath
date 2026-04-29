@@ -47,7 +47,7 @@ export function CertificateCard({
 
         <div className="p-10 text-center space-y-4">
           {/* Academy title */}
-          <p className="text-xs tracking-[0.3em] uppercase text-amber-400/70 font-semibold">AI-DS Academy</p>
+          <p className="text-xs tracking-[0.3em] uppercase text-amber-400/70 font-semibold">EduPath</p>
 
           {/* Main title */}
           <h1 className="text-3xl font-bold text-amber-300" style={{ fontFamily: "Georgia, serif", letterSpacing: "0.05em" }}>

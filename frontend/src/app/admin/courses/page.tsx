@@ -1,24 +1,24 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Search, Plus, Trash2, BookOpen, Video, Users, Settings, CheckSquare, CheckCircle, EyeOff, Eye } from "lucide-react";
 import toast from "react-hot-toast";
-
-const COURSES = [
-  { id: "1", title: "Engineering Mathematics", category: "Mathematics", desc: "Calculus, Linear Algebra, Differential Equations.", modules: 6, videos: 18, questions: 90, students: 420, published: true, grad: "#2F45D8", accent: "#2F45D8" },
-  { id: "2", title: "Physics Mechanics", category: "Physics", desc: "Newton's laws, kinematics, and energy systems.", modules: 5, videos: 15, questions: 75, students: 380, published: true, grad: "#E1E8FF", accent: "#7E8498" },
-  { id: "3", title: "Chemistry Fundamentals", category: "Chemistry", desc: "Organic, inorganic and physical chemistry.", modules: 8, videos: 24, questions: 120, students: 290, published: false, grad: "#2F45D8", accent: "#6A7085" },
-];
+import { api, type Course } from "@/lib/api";
 
 export default function AdminCoursesPage() {
+  const [courseList, setCourseList] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
   const [showBulkDelete, setShowBulkDelete] = useState(false);
-  const [publishedMap, setPublishedMap] = useState<Record<string, boolean>>(
-    Object.fromEntries(COURSES.map(c => [c.id, c.published]))
-  );
-  const [courseList, setCourseList] = useState(COURSES);
+
+  useEffect(() => {
+    api.courses.adminList()
+      .then(setCourseList)
+      .catch(() => toast.error("Failed to load courses"))
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = courseList.filter(c => !search || c.title.toLowerCase().includes(search.toLowerCase()));
   const allSelected = filtered.length > 0 && filtered.every(c => selected.includes(c.id));
@@ -26,24 +26,43 @@ export default function AdminCoursesPage() {
   const toggleSelect = (id: string) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
   const toggleAll = () => setSelected(allSelected ? [] : filtered.map(c => c.id));
 
-  const togglePublish = (id: string) => {
-    const isPublished = publishedMap[id];
-    setPublishedMap(m => ({ ...m, [id]: !isPublished }));
-    toast.success(isPublished ? "Course unpublished" : "Course published");
+  const togglePublish = async (id: string) => {
+    const course = courseList.find(c => c.id === id);
+    const wasPublished = course?.is_published ?? false;
+    // Optimistic update
+    setCourseList(list => list.map(c => c.id === id ? { ...c, is_published: !c.is_published } : c));
+    try {
+      await api.courses.togglePublish(id);
+      toast.success(wasPublished ? "Course unpublished" : "Course published");
+    } catch {
+      // Revert on failure
+      setCourseList(list => list.map(c => c.id === id ? { ...c, is_published: wasPublished } : c));
+      toast.error("Failed to update publish status");
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setCourseList(list => list.filter(c => c.id !== id));
-    setSelected(s => s.filter(x => x !== id));
-    setShowDeleteModal(null);
-    toast.success("Course deleted");
+  const handleDelete = async (id: string) => {
+    try {
+      await api.courses.delete(id);
+      setCourseList(list => list.filter(c => c.id !== id));
+      setSelected(s => s.filter(x => x !== id));
+      setShowDeleteModal(null);
+      toast.success("Course deleted");
+    } catch {
+      toast.error("Failed to delete course");
+    }
   };
 
-  const handleBulkDelete = () => {
-    setCourseList(list => list.filter(c => !selected.includes(c.id)));
-    toast.success(`${selected.length} courses deleted`);
-    setSelected([]);
-    setShowBulkDelete(false);
+  const handleBulkDelete = async () => {
+    try {
+      await Promise.all(selected.map(id => api.courses.delete(id)));
+      setCourseList(list => list.filter(c => !selected.includes(c.id)));
+      toast.success(`${selected.length} courses deleted`);
+      setSelected([]);
+      setShowBulkDelete(false);
+    } catch {
+      toast.error("Failed to delete courses");
+    }
   };
 
   return (
@@ -63,17 +82,17 @@ export default function AdminCoursesPage() {
       {/* Stats row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px" }}>
         {[
-          { label: "Total Courses",  value: courseList.length,                                      icon: BookOpen,     accent: "#2F45D8", bg: "rgba(47,69,216,0.1)"  },
-          { label: "Published",      value: courseList.filter(c => publishedMap[c.id]).length,      icon: CheckSquare,  accent: "#111322", bg: "rgba(47,69,216,0.1)"  },
-          { label: "Total Videos",   value: courseList.reduce((a, c) => a + c.videos, 0),           icon: Video,        accent: "#111322", bg: "rgba(47,69,216,0.1)"   },
-          { label: "Enrollments",    value: courseList.reduce((a, c) => a + c.students, 0),         icon: Users,        accent: "#111322", bg: "rgba(47,69,216,0.1)"  },
+          { label: "Total Courses",  value: courseList.length,                                         icon: BookOpen,    accent: "#2F45D8", bg: "rgba(47,69,216,0.1)"  },
+          { label: "Published",      value: courseList.filter(c => c.is_published).length,             icon: CheckSquare, accent: "#111322", bg: "rgba(47,69,216,0.1)"  },
+          { label: "Total Videos",   value: courseList.reduce((a, c) => a + (c.videos ?? 0), 0),       icon: Video,       accent: "#111322", bg: "rgba(47,69,216,0.1)" },
+          { label: "Enrollments",    value: courseList.reduce((a, c) => a + (c.students ?? 0), 0),     icon: Users,       accent: "#111322", bg: "rgba(47,69,216,0.1)"  },
         ].map(({ label, value, icon: Icon, accent, bg }) => (
           <div key={label} style={{ background: "rgba(17,19,34,0.03)", border: "1px solid rgba(17,19,34,0.07)", borderRadius: "14px", padding: "16px 18px", display: "flex", alignItems: "center", gap: "14px" }}>
             <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Icon size={18} color={accent} />
             </div>
             <div>
-              <p style={{ fontSize: "22px", fontWeight: 800, color: "#111322", margin: "0 0 2px", lineHeight: 1 }}>{value}</p>
+              <p style={{ fontSize: "22px", fontWeight: 800, color: "#111322", margin: "0 0 2px", lineHeight: 1 }}>{loading ? "—" : value}</p>
               <p style={{ fontSize: "12px", color: "rgba(17,19,34,0.4)", margin: 0 }}>{label}</p>
             </div>
           </div>
@@ -111,7 +130,11 @@ export default function AdminCoursesPage() {
       )}
 
       {/* Course grid */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "180px" }}>
+          <div style={{ width: "32px", height: "32px", border: "3px solid rgba(47,69,216,0.2)", borderTopColor: "#2F45D8", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        </div>
+      ) : filtered.length === 0 ? (
         <div style={{ background: "rgba(17,19,34,0.03)", border: "1px solid rgba(17,19,34,0.07)", borderRadius: "16px", padding: "48px 24px", textAlign: "center" }}>
           <BookOpen size={36} style={{ color: "rgba(17,19,34,0.15)", margin: "0 auto 12px", display: "block" }} />
           <p style={{ color: "rgba(17,19,34,0.45)", fontSize: "14px", margin: 0 }}>No courses found.</p>
@@ -119,7 +142,7 @@ export default function AdminCoursesPage() {
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" }}>
           {filtered.map(c => {
-            const isPublished = publishedMap[c.id] ?? c.published;
+            const isPublished = c.is_published ?? false;
             const isSelected = selected.includes(c.id);
             return (
               <div
@@ -159,7 +182,7 @@ export default function AdminCoursesPage() {
 
                   {/* Stats */}
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "6px" }}>
-                    {([["Modules", c.modules], ["Videos", c.videos], ["Questions", c.questions], ["Students", c.students]] as const).map(([label, val]) => (
+                    {([["Modules", c.modules], ["Videos", c.videos], ["Questions", c.quizzes], ["Students", c.students]] as const).map(([label, val]) => (
                       <div key={label} style={{ background: "rgba(17,19,34,0.04)", borderRadius: "10px", padding: "8px 4px", textAlign: "center" }}>
                         <p style={{ color: "#111322", fontSize: "13px", fontWeight: 700, margin: "0 0 2px" }}>{val}</p>
                         <p style={{ color: "rgba(17,19,34,0.38)", fontSize: "10px", margin: 0 }}>{label}</p>

@@ -89,6 +89,7 @@ class Course(Base):
     students_count= Column(Integer, default=0)
     grad          = Column(String(200))
     accent        = Column(String(20))
+    is_published  = Column(Boolean, default=False)
 
 
 class Enrollment(Base):
@@ -126,6 +127,45 @@ class ActivityLog(Base):
     student_name = Column(String(100))
     detail       = Column(Text)
     created_at   = Column(DateTime, default=datetime.utcnow)
+
+
+class CourseModule(Base):
+    __tablename__ = "course_modules"
+    __table_args__ = (UniqueConstraint("course_id", "num", name="uq_module"),)
+
+    id        = Column(Integer, primary_key=True, autoincrement=True)
+    course_id = Column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    num       = Column(Integer, nullable=False)
+    title     = Column(String(200), nullable=False)
+
+
+class ModuleVideo(Base):
+    __tablename__ = "module_videos"
+    __table_args__ = (UniqueConstraint("course_id", "module_num", "idx", name="uq_video"),)
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    course_id  = Column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    module_num = Column(Integer, nullable=False)
+    idx        = Column(Integer, nullable=False)
+    youtube_id = Column(String(20), nullable=False)
+    title      = Column(String(200), nullable=False)
+
+
+class ModuleQuestion(Base):
+    __tablename__ = "module_questions"
+    __table_args__ = (UniqueConstraint("course_id", "module_num", "idx", name="uq_question"),)
+
+    id          = Column(Integer, primary_key=True, autoincrement=True)
+    course_id   = Column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    module_num  = Column(Integer, nullable=False)
+    idx         = Column(Integer, nullable=False)
+    question    = Column(Text, nullable=False)
+    option_a    = Column(String(300), nullable=False)
+    option_b    = Column(String(300), nullable=False)
+    option_c    = Column(String(300), nullable=False)
+    option_d    = Column(String(300), nullable=False)
+    correct_idx = Column(Integer, nullable=False)
+    explanation = Column(Text)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

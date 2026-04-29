@@ -1,97 +1,88 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, CheckCircle, Lock, ChevronDown, ChevronUp, PlayCircle, FileQuestion, BookOpen, Sparkles, Network, Globe, Trophy, CircleCheckBig } from "lucide-react";
+import { ArrowLeft, CheckCircle, Lock, ChevronDown, ChevronUp, PlayCircle, FileQuestion, BookOpen, Sparkles, Network, Globe, Trophy, PanelLeft } from "lucide-react";
 import { VideoPlayer } from "@/components/student/VideoPlayer";
 import { MindMap } from "@/components/student/MindMap";
-import { api, type Course } from "@/lib/api";
-
-const MODULE_TITLES: Record<string, string[]> = {
-  "1": ["Limits & Derivatives", "Integration Techniques", "Differential Equations", "Linear Algebra", "Probability & Statistics", "Final Examination"],
-  "2": ["Kinematics", "Newton's Laws", "Work & Energy", "Rotational Motion", "Fluid Mechanics"],
-  "3": ["Atomic Structure", "Chemical Bonding", "Thermodynamics", "Equilibrium", "Organic Basics", "Electrochemistry", "Kinetics", "Lab Methods"],
-  "4": ["Programming Basics", "Control Flow", "Functions", "Arrays", "Data Structures", "Algorithms", "Final Project"],
-  "5": ["Circuit Laws", "Diodes", "Transistors", "Amplifiers"],
-};
+import { api, type Course, type CourseModule } from "@/lib/api";
 
 type AITool = "quiz" | "notes" | "resources" | "mindmap" | null;
-type ModuleState = {
-  id: string;
-  num: number;
-  title: string;
-  videos: { id: string; title: string; watched: boolean }[];
-  score: number | null;
-  unlocked: boolean;
-  completed: boolean;
-  isCurrent: boolean;
-};
-
-const MOCK_QUIZ = [
-  { q: "What is the derivative of sin(x)?", opts: ["cos(x)", "-cos(x)", "tan(x)", "-sin(x)"], correct: 0, exp: "The derivative of sin(x) is cos(x). This is a fundamental trigonometric derivative rule." },
-  { q: "Which rule is used to differentiate a product of two functions?", opts: ["Chain Rule", "Product Rule", "Quotient Rule", "Power Rule"], correct: 1, exp: "The Product Rule: d/dx[u·v] = u'v + uv'. It applies when differentiating the product of two functions." },
-];
 
 export default function CoursePage() {
   const params = useParams();
   const courseId = String(params.courseId);
   const [course, setCourse] = useState<Course | null>(null);
+  const [modules, setModules] = useState<CourseModule[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingModule, setSavingModule] = useState<number | null>(null);
   const [expandedModule, setExpandedModule] = useState<string | null>(null);
   const [currentVideo, setCurrentVideo] = useState<{ moduleId: string; index: number } | null>(null);
   const [aiTool, setAiTool] = useState<AITool>(null);
-  const [quizAnswers, setQuizAnswers] = useState<(number | null)[]>(MOCK_QUIZ.map(() => null));
+  const [quizQuestions, setQuizQuestions] = useState<{ q: string; opts: string[]; correct: number; exp: string }[]>([]);
+  const [quizAnswers, setQuizAnswers] = useState<(number | null)[]>([]);
   const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const refreshModules = async (cId: string, cData: Course) => {
+    const mods = await api.modules.list(cId).catch(() => [] as CourseModule[]);
+    setModules(mods);
+    const currentMod = mods.find(m => !m.completed && m.unlocked) ?? mods[0];
+    if (currentMod) {
+      setExpandedModule(String(currentMod.num));
+      setCurrentVideo({ moduleId: String(currentMod.num), index: 0 });
+      setSidebarOpen(false);
+    }
+    return mods;
+  };
 
   useEffect(() => {
     setLoading(true);
     api.courses.get(courseId)
-      .then(data => {
+      .then(async data => {
         setCourse(data);
-        const completed = Math.floor(((data.progress ?? 0) / 100) * data.modules);
-        const firstOpen = String(Math.min(data.modules, completed + 1));
-        setExpandedModule(firstOpen);
-        setCurrentVideo({ moduleId: firstOpen, index: 0 });
+        await refreshModules(courseId, data);
       })
       .finally(() => setLoading(false));
   }, [courseId]);
 
-  const modules = useMemo<ModuleState[]>(() => {
-    if (!course) return [];
-    const titles = MODULE_TITLES[course.id] ?? [];
-    const completedModules = Math.floor(((course.progress ?? 0) / 100) * course.modules);
-    const currentModule = Math.min(course.modules, completedModules + 1);
+  // Load quiz questions when Practice Quiz is opened
+  useEffect(() => {
+    if (aiTool === "quiz" && currentVideo && quizQuestions.length === 0) {
+      const modNum = Number(currentVideo.moduleId);
+      api.modules.getQuestions(courseId, modNum)
+        .then(qs => {
+          setQuizQuestions(qs);
+          setQuizAnswers(qs.map(() => null));
+          setQuizSubmitted(false);
+        })
+        .catch(() => {});
+    }
+    if (aiTool !== "quiz") {
+      setQuizQuestions([]);
+      setQuizAnswers([]);
+      setQuizSubmitted(false);
+    }
+  }, [aiTool, currentVideo, courseId]);
 
-    return Array.from({ length: course.modules }, (_, i) => {
-      const num = i + 1;
-      const completed = num <= completedModules;
-      const unlocked = Boolean(course.enrolled) && num <= currentModule;
-      const title = titles[i] ?? `${course.category || "Course"} Module ${num}`;
-      const videoCount = Math.max(1, Math.min(3, Math.ceil((course.videos || course.modules) / course.modules)));
-
-      return {
-        id: String(num),
-        num,
-        title,
-        videos: Array.from({ length: videoCount }, (_, videoIndex) => ({
-          id: "dQw4w9WgXcQ",
-          title: videoIndex === 0 ? `Introduction to ${title}` : `${title} Practice ${videoIndex + 1}`,
-          watched: completed || (num === currentModule && videoIndex === 0 && (course.progress ?? 0) > 0),
-        })),
-        score: completed ? Math.min(98, 82 + ((num * 3) % 13)) : null,
-        unlocked,
-        completed,
-        isCurrent: num === currentModule && !completed,
-      };
-    });
-  }, [course]);
-
-  const activeModule = currentVideo ? modules.find(m => m.id === currentVideo.moduleId) : null;
+  const activeModule = currentVideo ? modules.find(m => String(m.num) === currentVideo.moduleId) : null;
   const activeVideo = activeModule && currentVideo ? activeModule.videos[currentVideo.index] : null;
   const progress = course?.progress ?? 0;
-  const completedModules = course ? Math.floor((progress / 100) * course.modules) : 0;
+  const completedModules = modules.filter(m => m.completed).length;
   const courseComplete = progress >= 100;
+
+  // Called by VideoPlayer when the video finishes
+  const handleVideoEnd = async () => {
+    if (!activeModule || !currentVideo) return;
+    const nextIdx = currentVideo.index + 1;
+    if (nextIdx < activeModule.videos.length) {
+      // Advance to next video in this module
+      setCurrentVideo({ moduleId: currentVideo.moduleId, index: nextIdx });
+    } else if (!activeModule.completed && activeModule.unlocked) {
+      // All videos watched — auto-complete this module
+      await completeActiveModule();
+    }
+  };
 
   const completeActiveModule = async () => {
     if (!activeModule || !course || activeModule.completed || !activeModule.unlocked) return;
@@ -99,9 +90,14 @@ export default function CoursePage() {
     try {
       const result = await api.courses.completeModule(course.id, activeModule.num);
       setCourse(prev => prev ? { ...prev, progress: result.progress, completed: result.completed, enrolled: true } : prev);
-      const nextModule = String(Math.min(course.modules, activeModule.num + 1));
-      setExpandedModule(nextModule);
-      setCurrentVideo({ moduleId: nextModule, index: 0 });
+      // Refresh modules list from API
+      const mods = await api.modules.list(course.id).catch(() => modules);
+      setModules(mods);
+      const nextMod = mods.find(m => !m.completed && m.unlocked) ?? mods[mods.length - 1];
+      if (nextMod) {
+        setExpandedModule(String(nextMod.num));
+        setCurrentVideo({ moduleId: String(nextMod.num), index: 0 });
+      }
     } finally {
       setSavingModule(null);
     }
@@ -127,6 +123,9 @@ export default function CoursePage() {
 
       {/* -- Top header bar -- */}
       <div style={{ background: "linear-gradient(180deg,rgba(238,243,255,0.98),rgba(225,232,255,0.94))", borderBottom: "1px solid rgba(17,19,34,0.06)", padding: "12px 20px", display: "flex", alignItems: "center", gap: "14px", flexShrink: 0, zIndex: 10 }}>
+        <button onClick={() => setSidebarOpen(o => !o)} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "34px", height: "34px", borderRadius: "10px", background: sidebarOpen ? "rgba(47,69,216,0.1)" : "rgba(17,19,34,0.05)", border: `1px solid ${sidebarOpen ? "rgba(47,69,216,0.25)" : "rgba(17,19,34,0.08)"}`, color: sidebarOpen ? "#2F45D8" : "rgba(17,19,34,0.6)", cursor: "pointer", flexShrink: 0, outline: "none" }}>
+          <PanelLeft size={16} />
+        </button>
         <Link href="/dashboard/courses" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "34px", height: "34px", borderRadius: "10px", background: "rgba(17,19,34,0.05)", border: "1px solid rgba(17,19,34,0.08)", color: "rgba(17,19,34,0.6)", textDecoration: "none", flexShrink: 0, transition: "background .15s" }}>
           <ArrowLeft size={16} />
         </Link>
@@ -155,19 +154,21 @@ export default function CoursePage() {
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
         {/* -- Module sidebar -- */}
-        <div style={{ width: "272px", flexShrink: 0, borderRight: "1px solid rgba(17,19,34,0.06)", background: "linear-gradient(180deg,rgba(238,243,255,0.98),rgba(225,232,255,0.94))", overflowY: "auto", display: "flex", flexDirection: "column" }}>
+        <div style={{ width: sidebarOpen ? "272px" : "0", minWidth: 0, overflow: "hidden", flexShrink: 0, borderRight: sidebarOpen ? "1px solid rgba(17,19,34,0.06)" : "none", background: "linear-gradient(180deg,rgba(238,243,255,0.98),rgba(225,232,255,0.94))", display: "flex", flexDirection: "column", transition: "width .25s ease" }}>
+          <div style={{ width: "272px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "14px 10px", display: "flex", flexDirection: "column", gap: "4px" }}>
             {modules.map(mod => {
-              const isExpanded = expandedModule === mod.id;
-              const isActive = currentVideo?.moduleId === mod.id;
+              const modId = String(mod.num);
+              const isExpanded = expandedModule === modId;
+              const isActive = currentVideo?.moduleId === modId;
               return (
-                <div key={mod.id}>
+                <div key={modId}>
                   {/* Module header button */}
                   <button
                     onClick={() => {
                       if (!mod.unlocked) return;
-                      setExpandedModule(isExpanded ? null : mod.id);
-                      setCurrentVideo({ moduleId: mod.id, index: 0 });
+                      setExpandedModule(isExpanded ? null : modId);
+                      setCurrentVideo({ moduleId: modId, index: 0 });
                     }}
                     style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "12px", textAlign: "left", cursor: mod.unlocked ? "pointer" : "not-allowed", background: isExpanded ? "rgba(47,69,216,0.08)" : "transparent", border: `1px solid ${isExpanded ? "rgba(47,69,216,0.2)" : "transparent"}`, opacity: mod.unlocked ? 1 : 0.45, transition: "all .15s", outline: "none" }}
                   >
@@ -189,11 +190,11 @@ export default function CoursePage() {
                   {isExpanded && mod.unlocked && (
                     <div style={{ marginTop: "4px", marginLeft: "12px", paddingLeft: "12px", borderLeft: "1px solid rgba(17,19,34,0.07)", display: "flex", flexDirection: "column", gap: "3px", paddingBottom: "6px" }}>
                       {mod.videos.map((v, idx) => {
-                        const isCurrent = currentVideo?.moduleId === mod.id && currentVideo?.index === idx;
+                        const isCurrent = currentVideo?.moduleId === modId && currentVideo?.index === idx;
                         return (
                           <button
                             key={idx}
-                            onClick={() => setCurrentVideo({ moduleId: mod.id, index: idx })}
+                            onClick={() => setCurrentVideo({ moduleId: modId, index: idx })}
                             style={{ display: "flex", alignItems: "center", gap: "9px", padding: "8px 10px", borderRadius: "9px", textAlign: "left", cursor: "pointer", background: isCurrent ? "rgba(47,69,216,0.12)" : "transparent", border: `1px solid ${isCurrent ? "rgba(47,69,216,0.35)" : "transparent"}`, outline: "none", width: "100%", transition: "all .15s" }}
                           >
                             <div style={{ width: "20px", height: "20px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: v.watched ? "rgba(106,112,133,0.15)" : "rgba(17,19,34,0.06)" }}>
@@ -207,7 +208,7 @@ export default function CoursePage() {
                       })}
                       {mod.unlocked ? (
                         <Link
-                          href={`/dashboard/courses/${course.id}/test/${mod.id}`}
+                          href={`/dashboard/courses/${course.id}/test/${modId}`}
                           style={{ display: "flex", alignItems: "center", gap: "9px", padding: "8px 10px", borderRadius: "9px", textDecoration: "none", fontSize: "12px", color: mod.completed ? "#111322" : "#2F45D8", background: mod.completed ? "rgba(106,112,133,0.06)" : "rgba(47,69,216,0.07)", border: `1px solid ${mod.completed ? "rgba(106,112,133,0.2)" : "rgba(47,69,216,0.2)"}` }}
                         >
                           <FileQuestion size={13} />
@@ -223,6 +224,7 @@ export default function CoursePage() {
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
 
@@ -244,7 +246,7 @@ export default function CoursePage() {
                 </div>
                 {activeModule && !activeModule.completed && activeModule.unlocked && (
                   <Link
-                    href={`/dashboard/courses/${course.id}/test/${activeModule.id}`}
+                    href={`/dashboard/courses/${course.id}/test/${String(activeModule.num)}`}
                     style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "10px 20px", borderRadius: "12px", background: "linear-gradient(135deg,#2F45D8,#2336B8)", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, textDecoration: "none", flexShrink: 0 }}
                   >
                     <FileQuestion size={15} /> Take Module Test
@@ -252,28 +254,18 @@ export default function CoursePage() {
                 )}
                 {activeModule?.completed && (
                   <Link
-                    href={`/dashboard/courses/${course.id}/test/${activeModule.id}`}
+                    href={`/dashboard/courses/${course.id}/test/${String(activeModule.num)}`}
                     style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "10px 20px", borderRadius: "12px", background: "rgba(106,112,133,0.1)", border: "1px solid rgba(106,112,133,0.3)", color: "#111322", fontSize: "13px", fontWeight: 700, textDecoration: "none", flexShrink: 0 }}
                   >
                     <CheckCircle size={15} /> Retake Test - {activeModule.score}%
                   </Link>
                 )}
-                {activeModule && (
-                  <button
-                    onClick={completeActiveModule}
-                    disabled={!activeModule.unlocked || activeModule.completed || savingModule === activeModule.num}
-                    style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "10px 20px", borderRadius: "12px", background: activeModule.completed ? "rgba(47,69,216,0.12)" : activeModule.unlocked ? "linear-gradient(135deg,#2F45D8,#2336B8)" : "rgba(17,19,34,0.06)", color: activeModule.completed ? "#2F45D8" : activeModule.unlocked ? "#FFFFFF" : "rgba(17,19,34,0.35)", border: activeModule.completed ? "1px solid rgba(47,69,216,0.25)" : activeModule.unlocked ? "none" : "1px solid rgba(17,19,34,0.10)", fontSize: "13px", fontWeight: 700, cursor: !activeModule.unlocked || activeModule.completed ? "default" : "pointer", flexShrink: 0 }}
-                  >
-                    <CircleCheckBig size={15} />
-                    {activeModule.completed ? "Module Complete" : savingModule === activeModule.num ? "Saving..." : activeModule.unlocked ? "Mark Module Complete" : "Locked"}
-                  </button>
-                )}
               </div>
 
               {/* Video player */}
               {activeVideo && (
-                <div style={{ borderRadius: "16px", overflow: "hidden", border: "1px solid rgba(17,19,34,0.08)" }}>
-                  <VideoPlayer videoId={activeVideo.id} title={activeVideo.title} />
+                <div style={{ borderRadius: "16px", overflow: "hidden" }}>
+                  <VideoPlayer videoId={activeVideo.youtube_id} title={activeVideo.title} onComplete={handleVideoEnd} />
                 </div>
               )}
 
@@ -302,38 +294,42 @@ export default function CoursePage() {
                     </h3>
                     <button onClick={() => setAiTool(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(17,19,34,0.3)", fontSize: "12px" }}>Close</button>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                    {MOCK_QUIZ.map((q, qi) => (
-                      <div key={qi}>
-                        <p style={{ color: "#111322", fontWeight: 600, fontSize: "14px", margin: "0 0 12px" }}>Q{qi + 1}. {q.q}</p>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                          {q.opts.map((opt, oi) => {
-                            let bg = "rgba(17,19,34,0.03)", border = "rgba(17,19,34,0.08)", color = "rgba(17,19,34,0.65)";
-                            if (quizSubmitted) {
-                              if (oi === q.correct) { bg = "rgba(106,112,133,0.1)"; border = "rgba(106,112,133,0.5)"; color = "#111322"; }
-                              else if (oi === quizAnswers[qi] && oi !== q.correct) { bg = "rgba(47,69,216,0.1)"; border = "rgba(47,69,216,0.5)"; color = "#2F45D8"; }
-                              else { color = "rgba(17,19,34,0.3)"; }
-                            } else if (quizAnswers[qi] === oi) { bg = "rgba(47,69,216,0.12)"; border = "rgba(47,69,216,0.5)"; color = "#5368F0"; }
-                            return (
-                              <button key={oi} onClick={() => !quizSubmitted && setQuizAnswers(a => { const n = [...a]; n[qi] = oi; return n; })}
-                                style={{ width: "100%", textAlign: "left", padding: "12px 16px", borderRadius: "12px", fontSize: "13px", cursor: quizSubmitted ? "default" : "pointer", background: bg, border: `1px solid ${border}`, color, outline: "none", transition: "all .15s" }}>
-                                {opt}
-                              </button>
-                            );
-                          })}
+                  {quizQuestions.length === 0 ? (
+                    <p style={{ color: "rgba(17,19,34,0.45)", fontSize: "14px" }}>Loading questions…</p>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                      {quizQuestions.map((q, qi) => (
+                        <div key={qi}>
+                          <p style={{ color: "#111322", fontWeight: 600, fontSize: "14px", margin: "0 0 12px" }}>Q{qi + 1}. {q.q}</p>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            {q.opts.map((opt, oi) => {
+                              let bg = "rgba(17,19,34,0.03)", border = "rgba(17,19,34,0.08)", color = "rgba(17,19,34,0.65)";
+                              if (quizSubmitted) {
+                                if (oi === q.correct) { bg = "rgba(106,112,133,0.1)"; border = "rgba(106,112,133,0.5)"; color = "#111322"; }
+                                else if (oi === quizAnswers[qi] && oi !== q.correct) { bg = "rgba(47,69,216,0.1)"; border = "rgba(47,69,216,0.5)"; color = "#2F45D8"; }
+                                else { color = "rgba(17,19,34,0.3)"; }
+                              } else if (quizAnswers[qi] === oi) { bg = "rgba(47,69,216,0.12)"; border = "rgba(47,69,216,0.5)"; color = "#5368F0"; }
+                              return (
+                                <button key={oi} onClick={() => !quizSubmitted && setQuizAnswers(a => { const n = [...a]; n[qi] = oi; return n; })}
+                                  style={{ width: "100%", textAlign: "left", padding: "12px 16px", borderRadius: "12px", fontSize: "13px", cursor: quizSubmitted ? "default" : "pointer", background: bg, border: `1px solid ${border}`, color, outline: "none", transition: "all .15s" }}>
+                                  {opt}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {quizSubmitted && <p style={{ fontSize: "12px", color: "rgba(17,19,34,0.5)", background: "rgba(17,19,34,0.03)", padding: "12px 14px", borderRadius: "10px", marginTop: "10px" }}>{q.exp}</p>}
                         </div>
-                        {quizSubmitted && <p style={{ fontSize: "12px", color: "rgba(17,19,34,0.5)", background: "rgba(17,19,34,0.03)", padding: "12px 14px", borderRadius: "10px", marginTop: "10px" }}>{q.exp}</p>}
-                      </div>
-                    ))}
-                    {!quizSubmitted ? (
-                      <button onClick={() => setQuizSubmitted(true)} className="btn-primary" style={{ padding: "11px 24px", fontSize: "13px", alignSelf: "flex-start" }}>Check Answers</button>
-                    ) : (
-                      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                        <span style={{ color: "#111322", fontWeight: 700, fontSize: "14px" }}>Score: {quizAnswers.filter((a, i) => a === MOCK_QUIZ[i].correct).length}/{MOCK_QUIZ.length}</span>
-                        <button onClick={() => { setQuizSubmitted(false); setQuizAnswers(MOCK_QUIZ.map(() => null)); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#2F45D8", fontSize: "13px", fontWeight: 600 }}>Retry Quiz</button>
-                      </div>
-                    )}
-                  </div>
+                      ))}
+                      {!quizSubmitted ? (
+                        <button onClick={() => setQuizSubmitted(true)} className="btn-primary" style={{ padding: "11px 24px", fontSize: "13px", alignSelf: "flex-start" }}>Check Answers</button>
+                      ) : (
+                        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                          <span style={{ color: "#111322", fontWeight: 700, fontSize: "14px" }}>Score: {quizAnswers.filter((a, i) => a === quizQuestions[i].correct).length}/{quizQuestions.length}</span>
+                          <button onClick={() => { setQuizSubmitted(false); setQuizAnswers(quizQuestions.map(() => null)); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#2F45D8", fontSize: "13px", fontWeight: 600 }}>Retry Quiz</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

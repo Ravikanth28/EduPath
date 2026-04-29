@@ -1,247 +1,371 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronUp, Video, HelpCircle, Plus, Trash2, Save, Link2, CheckCircle } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Video, HelpCircle, Plus, Trash2, Save, Link2, CheckCircle, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { api, type AdminModule, type AdminVideo, type AdminQuestion, type Course } from "@/lib/api";
 
-const COURSE = {
-  id: "1", title: "Engineering Mathematics", published: true,
-  modules: [
-    { id: "1", num: 1, title: "Limits & Derivatives", videos: 3, questions: 12, passPct: 70, qPerTest: 6 },
-    { id: "2", num: 2, title: "Integration Techniques", videos: 3, questions: 10, passPct: 70, qPerTest: 5 },
-    { id: "3", num: 3, title: "Differential Equations", videos: 2, questions: 10, passPct: 70, qPerTest: 5 },
-    { id: "4", num: 4, title: "Linear Algebra", videos: 3, questions: 10, passPct: 70, qPerTest: 5 },
-    { id: "5", num: 5, title: "Probability & Statistics", videos: 2, questions: 8, passPct: 70, qPerTest: 4 },
-    { id: "6", num: 6, title: "Final Examination", videos: 0, questions: 30, passPct: 75, qPerTest: 30 },
-  ],
+// ── Style constants ──────────────────────────────────────────────────────────
+const BG      = "#06060F";
+const CARD    = "rgba(16,14,36,0.95)";
+const BORDER  = "rgba(255,255,255,0.07)";
+const PBORDER = "rgba(124,58,237,0.3)";
+const INPUT_S: React.CSSProperties = {
+  width: "100%", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: "10px", color: "#fff", padding: "11px 14px", fontSize: "13px",
+  outline: "none", boxSizing: "border-box", fontFamily: "inherit",
+};
+const focus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  e.target.style.borderColor = "rgba(124,58,237,0.5)";
+  e.target.style.boxShadow   = "0 0 0 3px rgba(124,58,237,0.1)";
+};
+const blur  = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  e.target.style.borderColor = "rgba(255,255,255,0.1)";
+  e.target.style.boxShadow   = "none";
 };
 
+function extractYoutubeId(url: string): string {
+  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : url.trim();
+}
+function ytThumb(id: string) { return `https://img.youtube.com/vi/${id}/mqdefault.jpg`; }
+function emptyVideo(): { title: string; url: string } { return { title: "", url: "" }; }
+
 type ModuleTab = "videos" | "questions";
+type QTab = "manual" | "csv" | "settings";
 
-const QUESTION_TABS = ["Add Manually", "Bulk CSV/Excel", "Checkpoint Qs", "Test Settings"] as const;
+function VideosPanel({ courseId, module }: { courseId: string; module: AdminModule }) {
+  const [saved, setSaved] = useState<AdminVideo[]>(module.videos);
+  const [drafts, setDrafts] = useState<{ title: string; url: string }[]>([emptyVideo()]);
+  const [saving, setSaving] = useState(false);
 
-export default function CourseManagePage() {
-  const params = useParams();
-  const [expandedModule, setExpandedModule] = useState<string | null>("1");
-  const [moduleTab, setModuleTab] = useState<Record<string, ModuleTab>>({});
-  const [qTab, setQTab] = useState<Record<string, number>>({});
-  const [videoForms, setVideoForms] = useState<Record<string, { title: string; url: string }[]>>({});
-  const [passPct, setPassPct] = useState<Record<string, number>>({});
+  const setDraft = (i: number, field: "title" | "url", val: string) =>
+    setDrafts(d => d.map((x, idx) => idx === i ? { ...x, [field]: val } : x));
 
-  const getVideos = (mid: string) => videoForms[mid] || [{ title: "", url: "" }];
-  const addVideo = (mid: string) => setVideoForms(v => ({ ...v, [mid]: [...getVideos(mid), { title: "", url: "" }] }));
-  const removeVideo = (mid: string, idx: number) => setVideoForms(v => ({ ...v, [mid]: getVideos(mid).filter((_, i) => i !== idx) }));
+  const handleSave = async () => {
+    const newOnes = drafts.filter(d => d.title.trim() || d.url.trim()).map(d => ({
+      title: d.title.trim() || "Untitled",
+      youtube_id: extractYoutubeId(d.url),
+    }));
+    const all = [
+      ...saved.map(v => ({ title: v.title, youtube_id: v.youtube_id })),
+      ...newOnes,
+    ];
+    if (!all.length) { toast.error("No videos to save"); return; }
+    setSaving(true);
+    try {
+      await api.modules.saveVideos(courseId, module.num, all);
+      toast.success("Videos saved!");
+      setSaved([...saved, ...newOnes.map((v, i) => ({ idx: saved.length + i + 1, ...v }))]);
+      setDrafts([emptyVideo()]);
+    } catch { toast.error("Failed to save videos"); }
+    finally { setSaving(false); }
+  };
+
+  const deleteVideo = async (idx: number) => {
+    const next = saved.filter(v => v.idx !== idx).map(v => ({ title: v.title, youtube_id: v.youtube_id }));
+    try {
+      await api.modules.saveVideos(courseId, module.num, next);
+      setSaved(saved.filter(v => v.idx !== idx).map((v, i) => ({ ...v, idx: i + 1 })));
+      toast.success("Video removed");
+    } catch { toast.error("Failed to remove video"); }
+  };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-5">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href="/admin/courses" className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors">
-          <ArrowLeft size={18} />
-        </Link>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="font-bold text-white text-lg">{COURSE.title}</h1>
-            {COURSE.published ? <span className="badge-green">Published</span> : <span className="badge-amber">Draft</span>}
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      {saved.length > 0 && (
+        <div>
+          <p style={{ fontSize: "11px", letterSpacing: "0.08em", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", marginBottom: "10px" }}>Saved Videos</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {saved.map(v => (
+              <div key={v.idx} style={{ display: "flex", alignItems: "center", gap: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "10px 12px" }}>
+                <img src={ytThumb(v.youtube_id)} alt="" style={{ width: "52px", height: "36px", borderRadius: "6px", objectFit: "cover", flexShrink: 0, background: "#111" }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ color: "#fff", fontSize: "13px", fontWeight: 600, margin: "0 0 2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.title}</p>
+                  <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "11px", margin: 0 }}>https://youtu.be/{v.youtube_id}</p>
+                </div>
+                <span style={{ fontSize: "11px", padding: "2px 10px", borderRadius: "20px", background: "rgba(124,58,237,0.2)", color: "#A78BFA", fontWeight: 700, flexShrink: 0 }}>#{v.idx}</span>
+                <button onClick={() => deleteVideo(v.idx)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(239,68,68,0.6)", padding: "4px", display: "flex", flexShrink: 0 }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
           </div>
-          <p className="text-xs text-white/40">{COURSE.modules.length} modules</p>
+        </div>
+      )}
+
+      <div>
+        <p style={{ fontSize: "11px", letterSpacing: "0.08em", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", marginBottom: "10px" }}>
+          {saved.length > 0 ? "Add More Videos" : "Add Videos"}
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {drafts.map((d, i) => (
+            <div key={i} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px", padding: "14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                <span style={{ color: "rgba(255,255,255,0.35)", fontSize: "12px" }}>Video {saved.length + i + 1}</span>
+                {drafts.length > 1 && (
+                  <button onClick={() => setDrafts(dr => dr.filter((_, idx) => idx !== i))} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(239,68,68,0.5)", display: "flex" }}>
+                    <Trash2 size={13} />
+                  </button>
+                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <input value={d.title} onChange={e => setDraft(i, "title", e.target.value)} placeholder="Video title" style={INPUT_S} onFocus={focus} onBlur={blur} />
+                <div style={{ position: "relative" }}>
+                  <Link2 size={13} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.3)", pointerEvents: "none" }} />
+                  <input value={d.url} onChange={e => setDraft(i, "url", e.target.value)} placeholder="https://www.youtube.com/watch?v=..." style={{ ...INPUT_S, paddingLeft: "34px" }} onFocus={focus} onBlur={blur} />
+                  {d.url.includes("youtube") && <span style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", fontSize: "11px", color: "#6EE7B7" }}>✓</span>}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Module accordion */}
-      <div className="space-y-3">
-        {COURSE.modules.map(mod => {
-          const tab = moduleTab[mod.id] || "videos";
-          const qTabIdx = qTab[mod.id] || 0;
-          const isOpen = expandedModule === mod.id;
-
-          return (
-            <div key={mod.id} className="glass-card overflow-hidden">
-              {/* Module header */}
-              <button
-                onClick={() => setExpandedModule(isOpen ? null : mod.id)}
-                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-white/[0.02] transition-colors text-left"
-              >
-                <div className="w-8 h-8 rounded-xl bg-purple-600/20 text-purple-400 font-bold text-sm flex items-center justify-center flex-shrink-0">
-                  {mod.num}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-white">{mod.title}</p>
-                  <div className="flex gap-4 text-xs text-white/40 mt-0.5 flex-wrap">
-                    <span className="flex items-center gap-1"><Video size={10} />{mod.videos} videos</span>
-                    <span className="flex items-center gap-1"><HelpCircle size={10} />{mod.questions} questions</span>
-                    <span>Pass: {passPct[mod.id] ?? mod.passPct}%</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {mod.videos > 0 && <CheckCircle size={14} className="text-green-400" />}
-                  {isOpen ? <ChevronUp size={16} className="text-white/40" /> : <ChevronDown size={16} className="text-white/40" />}
-                </div>
-              </button>
-
-              {isOpen && (
-                <div className="border-t border-white/[0.06]">
-                  {/* Tab selector */}
-                  <div className="flex border-b border-white/[0.06]">
-                    {["Videos", "Questions"].map((t, i) => (
-                      <button
-                        key={t}
-                        onClick={() => setModuleTab(m => ({ ...m, [mod.id]: i === 0 ? "videos" : "questions" }))}
-                        className={`px-5 py-3 text-sm font-medium transition-colors flex items-center gap-2 ${tab === (i === 0 ? "videos" : "questions") ? "text-purple-400 border-b-2 border-purple-500 -mb-[1px]" : "text-white/50 hover:text-white"}`}
-                      >
-                        {i === 0 ? <Video size={14} /> : <HelpCircle size={14} />} {t}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="p-5">
-                    {tab === "videos" && (
-                      <div className="space-y-4">
-                        {getVideos(mod.id).map((v, idx) => (
-                          <div key={idx} className="glass-card p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-white/40 font-mono">Video #{idx + 1}</span>
-                              {getVideos(mod.id).length > 1 && (
-                                <button onClick={() => removeVideo(mod.id, idx)} className="text-red-400 hover:text-red-300">
-                                  <Trash2 size={14} />
-                                </button>
-                              )}
-                            </div>
-                            <input
-                              value={v.title}
-                              onChange={e => { const n = [...getVideos(mod.id)]; n[idx] = { ...n[idx], title: e.target.value }; setVideoForms(vf => ({ ...vf, [mod.id]: n })); }}
-                              placeholder="Video title"
-                              className="input-field text-sm"
-                            />
-                            <div className="relative">
-                              <Link2 size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
-                              <input
-                                value={v.url}
-                                onChange={e => { const n = [...getVideos(mod.id)]; n[idx] = { ...n[idx], url: e.target.value }; setVideoForms(vf => ({ ...vf, [mod.id]: n })); }}
-                                placeholder="YouTube URL"
-                                className="input-field pl-10 text-sm"
-                              />
-                              {v.url.includes("youtube.com") && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-green-400">Valid URL</span>}
-                            </div>
-                          </div>
-                        ))}
-                        <button onClick={() => addVideo(mod.id)} className="btn-secondary flex items-center gap-2 px-4 py-2 text-sm">
-                          <Plus size={14} /> Add Another Video
-                        </button>
-                        <button onClick={() => toast.success("Videos saved!")} className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm">
-                          <Save size={14} /> Save Videos
-                        </button>
-                      </div>
-                    )}
-
-                    {tab === "questions" && (
-                      <div>
-                        {/* Question sub-tabs */}
-                        <div className="flex gap-1 mb-4 flex-wrap">
-                          {QUESTION_TABS.map((t, i) => (
-                            <button key={t} onClick={() => setQTab(q => ({ ...q, [mod.id]: i }))}
-                              className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${(qTabIdx) === i ? "bg-purple-600/20 text-purple-400 border border-purple-600/30" : "text-white/50 hover:text-white border border-white/[0.06]"}`}>
-                              {t}
-                            </button>
-                          ))}
-                        </div>
-
-                        {qTabIdx === 0 && (
-                          <div className="space-y-4">
-                            <div className="glass-card p-4 space-y-3">
-                              <span className="badge-purple text-xs">Q1</span>
-                              <textarea placeholder="Question text..." rows={2} className="input-field resize-none text-sm" />
-                              <div className="grid grid-cols-2 gap-2">
-                                {["A", "B", "C", "D"].map(l => (
-                                  <div key={l} className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/40 font-bold">{l}.</span>
-                                    <input placeholder={`Option ${l}`} className="input-field pl-8 text-sm" />
-                                  </div>
-                                ))}
-                              </div>
-                              <div>
-                                <label className="text-xs text-white/40 mb-1 block">Correct Option</label>
-                                <div className="flex gap-2">
-                                  {["A", "B", "C", "D"].map(l => (
-                                    <button key={l} className="w-8 h-8 rounded-lg border border-white/20 text-xs text-white/60 hover:border-green-500/60 hover:text-green-400 hover:bg-green-500/10 transition-all">{l}</button>
-                                  ))}
-                                </div>
-                              </div>
-                              <input placeholder="Explanation (optional)" className="input-field text-sm" />
-                            </div>
-                            <div className="flex gap-3">
-                              <button onClick={() => toast.success("Question added")} className="btn-secondary flex items-center gap-2 px-4 py-2 text-sm"><Plus size={13} /> Add Question</button>
-                              <button onClick={() => toast.success("Questions saved!")} className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"><Save size={13} /> Save Questions</button>
-                            </div>
-                          </div>
-                        )}
-
-                        {qTabIdx === 1 && (
-                          <div className="space-y-4">
-                            <div className="glass-card p-4 text-xs text-white/50 space-y-1">
-                              <p className="text-white font-semibold mb-2">CSV Format Guide</p>
-                              <code className="block bg-white/[0.04] p-3 rounded-lg font-mono text-xs leading-relaxed text-cyan-400">
-                                question,optionA,optionB,optionC,optionD,correct,explanation<br/>
-                                What is a derivative?,Rate of change,Area under curve,Vector cross product,Matrix rank,A,Derivative measures instantaneous rate of change
-                              </code>
-                            </div>
-                            <textarea rows={6} placeholder="Paste CSV content here..." className="input-field resize-none text-sm font-mono" />
-                            <button onClick={() => toast.success("Questions imported!")} className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm"><Save size={13} /> Import Questions</button>
-                          </div>
-                        )}
-
-                        {qTabIdx === 2 && (
-                          <div className="space-y-4">
-                            <div className="glass-card p-4 text-sm text-white/50 border border-cyan-600/20">
-                              Checkpoint questions pause the video at a specified timestamp and require a correct answer to continue.
-                            </div>
-                            <div className="glass-card p-4 space-y-3">
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="text-xs text-white/40 mb-1 block">Video</label>
-                                  <select className="input-field text-sm"><option>Video #1</option><option>Video #2</option></select>
-                                </div>
-                                <div>
-                                  <label className="text-xs text-white/40 mb-1 block">Timestamp (MM:SS)</label>
-                                  <input placeholder="02:30" className="input-field text-sm" />
-                                </div>
-                              </div>
-                              <textarea placeholder="Checkpoint question text..." rows={2} className="input-field resize-none text-sm" />
-                              <div className="grid grid-cols-2 gap-2">
-                                {["A", "B", "C", "D"].map(l => (
-                                  <input key={l} placeholder={`Option ${l}`} className="input-field text-sm" />
-                                ))}
-                              </div>
-                              <button onClick={() => toast.success("Checkpoint saved!")} className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm"><Save size={13} /> Save Checkpoints</button>
-                            </div>
-                          </div>
-                        )}
-
-                        {qTabIdx === 3 && (
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="text-xs text-white/40 uppercase tracking-wider mb-1.5 block">Passing Score (%)</label>
-                                <input type="number" defaultValue={passPct[mod.id] ?? mod.passPct} onChange={e => setPassPct(p => ({ ...p, [mod.id]: Number(e.target.value) }))} min={1} max={100} className="input-field" />
-                              </div>
-                              <div>
-                                <label className="text-xs text-white/40 uppercase tracking-wider mb-1.5 block">Questions per Test</label>
-                                <input type="number" defaultValue={mod.qPerTest} min={1} className="input-field" />
-                              </div>
-                            </div>
-                            <button onClick={() => toast.success("Settings saved!")} className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm"><Save size={13} /> Save Settings</button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <div style={{ display: "flex", gap: "10px" }}>
+        <button onClick={() => setDrafts(d => [...d, emptyVideo()])} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 18px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", color: "rgba(255,255,255,0.7)", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
+          <Plus size={14} /> Add Another Video
+        </button>
+        <button onClick={handleSave} disabled={saving} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "linear-gradient(135deg,#7C3AED,#6D28D9)", borderRadius: "10px", color: "#fff", fontSize: "13px", fontWeight: 700, border: "none", cursor: "pointer", boxShadow: "0 2px 16px rgba(124,58,237,0.35)", opacity: saving ? 0.7 : 1 }}>
+          {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Save size={14} />} Save Videos
+        </button>
       </div>
     </div>
   );
 }
+
+type QDraft = { q: string; opts: string[]; correct: number; exp: string };
+function emptyQ(): QDraft { return { q: "", opts: ["", "", "", ""], correct: 0, exp: "" }; }
+
+function QuestionsPanel({ courseId, module }: { courseId: string; module: AdminModule }) {
+  const [qTab, setQTab] = useState<QTab>("manual");
+  const [saved, setSaved] = useState<AdminQuestion[]>(module.questions);
+  const [drafts, setDrafts] = useState<QDraft[]>([emptyQ()]);
+  const [csvText, setCsvText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const setDraftField = (i: number, field: keyof QDraft, val: string | number | string[]) =>
+    setDrafts(d => d.map((x, idx) => idx === i ? { ...x, [field]: val } : x));
+
+  const saveManual = async () => {
+    const valid = drafts.filter(d => d.q.trim() && d.opts.every(o => o.trim()));
+    if (!valid.length) { toast.error("Fill in at least one complete question"); return; }
+    const all = [
+      ...saved.map(q => ({ q: q.q, opts: q.opts, correct: q.correct, exp: q.exp || "" })),
+      ...valid,
+    ];
+    setSaving(true);
+    try {
+      await api.modules.saveQuestions(courseId, module.num, all);
+      toast.success(`${valid.length} question(s) saved!`);
+      setSaved([...saved, ...valid.map((q, i) => ({ idx: saved.length + i + 1, ...q }))]);
+      setDrafts([emptyQ()]);
+    } catch { toast.error("Failed to save questions"); }
+    finally { setSaving(false); }
+  };
+
+  const saveCSV = async () => {
+    const lines = csvText.trim().split("\n").filter(Boolean);
+    const parsed: QDraft[] = [];
+    for (const line of lines) {
+      const cols = line.split(",").map(c => c.trim().replace(/^"|"$/g, ""));
+      if (cols.length < 6) continue;
+      parsed.push({ q: cols[0], opts: [cols[1], cols[2], cols[3], cols[4]], correct: ["A","B","C","D"].indexOf(cols[5].toUpperCase()), exp: cols[6] || "" });
+    }
+    if (!parsed.length) { toast.error("No valid rows found"); return; }
+    const all = [
+      ...saved.map(q => ({ q: q.q, opts: q.opts, correct: q.correct, exp: q.exp || "" })),
+      ...parsed,
+    ];
+    setSaving(true);
+    try {
+      await api.modules.saveQuestions(courseId, module.num, all);
+      toast.success(`${parsed.length} questions imported!`);
+      setSaved([...saved, ...parsed.map((q, i) => ({ idx: saved.length + i + 1, ...q }))]);
+      setCsvText("");
+    } catch { toast.error("Failed to import questions"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+        {([["manual", "Add Manually"], ["csv", "Bulk CSV"], ["settings", "Settings"]] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setQTab(key)}
+            style={{ padding: "7px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 600, cursor: "pointer", border: `1px solid ${qTab === key ? "rgba(124,58,237,0.4)" : "rgba(255,255,255,0.08)"}`, background: qTab === key ? "rgba(124,58,237,0.2)" : "transparent", color: qTab === key ? "#C4B5FD" : "rgba(255,255,255,0.4)" }}>
+            {label}
+          </button>
+        ))}
+        <span style={{ marginLeft: "auto", fontSize: "12px", color: "rgba(255,255,255,0.3)" }}>{saved.length} saved</span>
+      </div>
+
+      {qTab === "manual" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {drafts.map((d, i) => (
+            <div key={i} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px", padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "11px", padding: "2px 10px", borderRadius: "20px", background: "rgba(124,58,237,0.2)", color: "#A78BFA", fontWeight: 700 }}>Q{saved.length + i + 1}</span>
+                {drafts.length > 1 && <button onClick={() => setDrafts(dr => dr.filter((_, idx) => idx !== i))} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(239,68,68,0.5)", display: "flex" }}><Trash2 size={13} /></button>}
+              </div>
+              <textarea value={d.q} onChange={e => setDraftField(i, "q", e.target.value)} placeholder="Question text..." rows={2} style={{ ...INPUT_S, resize: "none" }} onFocus={focus} onBlur={blur} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                {["A","B","C","D"].map((lbl, oi) => (
+                  <div key={lbl} style={{ position: "relative" }}>
+                    <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.35)" }}>{lbl}.</span>
+                    <input value={d.opts[oi]} onChange={e => { const o = [...d.opts]; o[oi] = e.target.value; setDraftField(i, "opts", o); }} placeholder={`Option ${lbl}`} style={{ ...INPUT_S, paddingLeft: "28px" }} onFocus={focus} onBlur={blur} />
+                  </div>
+                ))}
+              </div>
+              <div>
+                <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginBottom: "6px" }}>Correct answer</p>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  {["A","B","C","D"].map((lbl, oi) => (
+                    <button key={lbl} onClick={() => setDraftField(i, "correct", oi)} type="button"
+                      style={{ width: "36px", height: "36px", borderRadius: "8px", border: `1px solid ${d.correct === oi ? "rgba(16,185,129,0.6)" : "rgba(255,255,255,0.12)"}`, background: d.correct === oi ? "rgba(16,185,129,0.15)" : "transparent", color: d.correct === oi ? "#6EE7B7" : "rgba(255,255,255,0.4)", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <input value={d.exp} onChange={e => setDraftField(i, "exp", e.target.value)} placeholder="Explanation (optional)" style={INPUT_S} onFocus={focus} onBlur={blur} />
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button onClick={() => setDrafts(d => [...d, emptyQ()])} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 18px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", color: "rgba(255,255,255,0.7)", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
+              <Plus size={14} /> Add Question
+            </button>
+            <button onClick={saveManual} disabled={saving} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "linear-gradient(135deg,#7C3AED,#6D28D9)", borderRadius: "10px", color: "#fff", fontSize: "13px", fontWeight: 700, border: "none", cursor: "pointer", boxShadow: "0 2px 16px rgba(124,58,237,0.35)", opacity: saving ? 0.7 : 1 }}>
+              {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Save size={14} />} Save Questions
+            </button>
+          </div>
+        </div>
+      )}
+
+      {qTab === "csv" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "14px" }}>
+            <p style={{ color: "#fff", fontSize: "13px", fontWeight: 600, marginBottom: "8px" }}>CSV Format</p>
+            <pre style={{ fontSize: "11px", color: "#67E8F9", background: "rgba(0,0,0,0.3)", borderRadius: "8px", padding: "10px", margin: 0, overflowX: "auto", lineHeight: 1.7, fontFamily: "monospace" }}>{`question,optionA,optionB,optionC,optionD,correct,explanation\nWhat is a derivative?,Rate of change,Area,Vector,Matrix rank,A,Measures rate`}</pre>
+          </div>
+          <textarea value={csvText} onChange={e => setCsvText(e.target.value)} placeholder="Paste CSV content here..." rows={7} style={{ ...INPUT_S, resize: "vertical", fontFamily: "monospace", fontSize: "12px" }} onFocus={focus} onBlur={blur} />
+          <button onClick={saveCSV} disabled={saving} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "linear-gradient(135deg,#7C3AED,#6D28D9)", borderRadius: "10px", color: "#fff", fontSize: "13px", fontWeight: 700, border: "none", cursor: "pointer", boxShadow: "0 2px 16px rgba(124,58,237,0.35)", width: "fit-content", opacity: saving ? 0.7 : 1 }}>
+            {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Save size={14} />} Import Questions
+          </button>
+        </div>
+      )}
+
+      {qTab === "settings" && (
+        <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "10px", padding: "16px" }}>
+          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px", margin: 0 }}>Pass percentage and questions-per-test settings coming soon.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function CourseManagePage() {
+  const { id } = useParams<{ id: string }>();
+  const [course, setCourse] = useState<Course | null>(null);
+  const [modules, setModules] = useState<AdminModule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedNum, setExpandedNum] = useState<number | null>(null);
+  const [moduleTab, setModuleTab] = useState<Record<number, ModuleTab>>({});
+
+  useEffect(() => {
+    Promise.all([
+      api.courses.get(id as string),
+      api.modules.adminList(id as string),
+    ]).then(([c, mods]) => {
+      setCourse(c);
+      setModules(mods);
+      if (mods.length) setExpandedNum(mods[0].num);
+    }).catch(() => toast.error("Failed to load course"))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) return (
+    <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: "36px", height: "36px", border: "3px solid rgba(124,58,237,0.2)", borderTopColor: "#7C3AED", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight: "100vh", background: BG, padding: "28px 24px" }}>
+      <div style={{ maxWidth: "860px", margin: "0 auto" }}>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "28px" }}>
+          <Link href="/admin/courses" style={{ width: "36px", height: "36px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.5)", textDecoration: "none", flexShrink: 0 }}
+            onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(124,58,237,0.5)"; (e.currentTarget as HTMLAnchorElement).style.color = "#fff"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(255,255,255,0.1)"; (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.5)"; }}>
+            <ArrowLeft size={16} />
+          </Link>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              <h1 style={{ color: "#fff", fontWeight: 800, fontSize: "22px", margin: 0 }}>{course?.title ?? "Course"}</h1>
+              {course?.is_published
+                ? <span style={{ fontSize: "12px", padding: "3px 10px", borderRadius: "20px", background: "rgba(16,185,129,0.15)", color: "#6EE7B7", border: "1px solid rgba(16,185,129,0.3)", fontWeight: 600 }}>Published</span>
+                : <span style={{ fontSize: "12px", padding: "3px 10px", borderRadius: "20px", background: "rgba(245,158,11,0.15)", color: "#FCD34D", border: "1px solid rgba(245,158,11,0.3)", fontWeight: 600 }}>Draft</span>}
+            </div>
+            <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "13px", margin: "3px 0 0" }}>{modules.length} modules</p>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {modules.map(mod => {
+            const isOpen = expandedNum === mod.num;
+            const tab = moduleTab[mod.num] || "videos";
+
+            return (
+              <div key={mod.num} style={{ background: CARD, border: `1px solid ${isOpen ? PBORDER : BORDER}`, borderRadius: "14px", overflow: "hidden", transition: "border-color .2s" }}>
+                <button onClick={() => setExpandedNum(isOpen ? null : mod.num)}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: "14px", padding: "16px 18px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+                  <div style={{ width: "34px", height: "34px", borderRadius: "50%", background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.35)", color: "#A78BFA", fontWeight: 800, fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    {mod.num}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ color: "#fff", fontWeight: 700, fontSize: "14px", margin: "0 0 3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{mod.title}</p>
+                    <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "rgba(255,255,255,0.35)" }}><Video size={11} />{mod.videos.length} videos</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "rgba(255,255,255,0.35)" }}><HelpCircle size={11} />{mod.questions.length} questions</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+                    {mod.videos.length > 0 && <CheckCircle size={16} color="#6EE7B7" />}
+                    {mod.questions.length > 0 && <CheckCircle size={16} color="#A78BFA" />}
+                    {isOpen ? <ChevronUp size={16} color="rgba(255,255,255,0.3)" /> : <ChevronDown size={16} color="rgba(255,255,255,0.3)" />}
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                      {([["videos", Video, `Videos (${mod.videos.length})`], ["questions", HelpCircle, `Questions (${mod.questions.length})`]] as const).map(([key, Icon, label]) => (
+                        <button key={key} onClick={() => setModuleTab(t => ({ ...t, [mod.num]: key as ModuleTab }))}
+                          style={{ display: "flex", alignItems: "center", gap: "7px", padding: "12px 18px", fontSize: "13px", fontWeight: 600, cursor: "pointer", background: "none", border: "none", borderBottom: tab === key ? "2px solid #7C3AED" : "2px solid transparent", color: tab === key ? "#A78BFA" : "rgba(255,255,255,0.4)", marginBottom: "-1px", transition: "color .15s" }}>
+                          <Icon size={14} /> {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ padding: "20px 18px" }}>
+                      {tab === "videos"
+                        ? <VideosPanel courseId={id as string} module={mod} />
+                        : <QuestionsPanel courseId={id as string} module={mod} />}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {modules.length === 0 && (
+          <div style={{ textAlign: "center", padding: "60px 20px", color: "rgba(255,255,255,0.3)", fontSize: "14px" }}>
+            No modules found. This course has no modules yet.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

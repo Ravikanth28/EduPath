@@ -1,16 +1,27 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Minus, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Minus, Upload, PlayCircle, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
 
-const CATEGORIES = ["Mathematics", "Physics", "Chemistry", "Computer Science", "Electronics", "Mechanics", "Engineering Drawing", "English"];
+const CATEGORIES = ["Mathematics", "Physics", "Chemistry", "Computer Science", "Electronics", "Mechanics", "Engineering Drawing", "English", "AI & Data Science", "Other"];
+
+const BG = "#06060F";
+const CARD = "rgba(16,14,36,0.95)";
+const BORDER = "rgba(124,58,237,0.25)";
+const INPUT_BG = "rgba(255,255,255,0.04)";
+const INPUT_BORDER = "rgba(255,255,255,0.1)";
+const LABEL: React.CSSProperties = { color: "rgba(255,255,255,0.75)", fontSize: "14px", fontWeight: 600, marginBottom: "8px", display: "block" };
+const INPUT: React.CSSProperties = { width: "100%", background: INPUT_BG, border: `1px solid ${INPUT_BORDER}`, borderRadius: "10px", color: "#fff", padding: "12px 16px", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
 
 export default function NewCoursePage() {
-  const [form, setForm] = useState({ title: "", desc: "", category: "", thumbnail: "" });
+  const [form, setForm] = useState({ title: "", desc: "", category: "", videos: 0, quizzes: 0 });
   const [moduleCount, setModuleCount] = useState(3);
-  const [moduleNames, setModuleNames] = useState<string[]>(Array(3).fill(""));
+  const [moduleNames, setModuleNames] = useState<string[]>(["Module 1", "Module 2", "Module 3"]);
+  const [thumbTab, setThumbTab] = useState<"youtube" | "upload">("youtube");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -19,127 +30,221 @@ export default function NewCoursePage() {
     setModuleCount(next);
     setModuleNames(prev => {
       const arr = [...prev];
-      while (arr.length < next) arr.push("");
+      while (arr.length < next) arr.push(`Module ${arr.length + 1}`);
       return arr.slice(0, next);
     });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title || !form.category) { toast.error("Title and category are required."); return; }
+    if (!form.title.trim()) { toast.error("Course title is required."); return; }
+    if (!form.category) { toast.error("Please select a category."); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1200));
-    setLoading(false);
-    toast.success("Course created!");
-    router.push("/admin/courses");
+    try {
+      await api.courses.create({
+        title: form.title.trim(),
+        desc: form.desc.trim(),
+        category: form.category,
+        modules: moduleCount,
+        module_names: moduleNames.slice(0, moduleCount),
+        videos: form.videos,
+        quizzes: form.quizzes,
+      } as never);
+      toast.success("Course created!");
+      router.push("/admin/courses");
+    } catch {
+      toast.error("Failed to create course.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const focusStyle = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    e.target.style.borderColor = "rgba(124,58,237,0.6)";
+    e.target.style.boxShadow = "0 0 0 3px rgba(124,58,237,0.12)";
+  };
+  const blurStyle = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    e.target.style.borderColor = INPUT_BORDER;
+    e.target.style.boxShadow = "none";
   };
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/admin/courses" className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors">
-          <ArrowLeft size={18} />
-        </Link>
-        <div>
-          <h1 className="text-xl font-bold text-white">New Course</h1>
-          <p className="text-white/40 text-sm">Create a new course shell with modules</p>
+    <div style={{ minHeight: "100vh", background: BG, padding: "32px 24px" }}>
+      <div style={{ maxWidth: "680px", margin: "0 auto" }}>
+
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "32px" }}>
+          <Link href="/admin/courses" style={{ width: "38px", height: "38px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.5)", textDecoration: "none", flexShrink: 0, transition: "all .15s" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(124,58,237,0.5)"; (e.currentTarget as HTMLAnchorElement).style.color = "#fff"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(255,255,255,0.1)"; (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.5)"; }}>
+            <ArrowLeft size={16} />
+          </Link>
+          <div>
+            <h1 style={{ margin: 0, fontSize: "26px", fontWeight: 800, lineHeight: 1.2 }}>
+              <span style={{ color: "#fff" }}>Create </span>
+              <span style={{ background: "linear-gradient(90deg,#A78BFA,#60A5FA)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>New Course</span>
+            </h1>
+            <p style={{ margin: "4px 0 0", color: "rgba(255,255,255,0.35)", fontSize: "13px" }}>Modules will be generated automatically</p>
+          </div>
         </div>
-      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="glass-card p-6 space-y-5 red-border">
-          {/* Title */}
-          <div>
-            <label className="text-xs text-white/50 uppercase tracking-wider mb-1.5 block">Course Title *</label>
-            <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Machine Learning Fundamentals" className="input-field" />
-          </div>
+        {/* Card */}
+        <form onSubmit={handleSubmit}>
+          <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: "18px", padding: "32px", display: "flex", flexDirection: "column", gap: "24px", boxShadow: "0 0 60px rgba(124,58,237,0.08)" }}>
 
-          {/* Description */}
-          <div>
-            <label className="text-xs text-white/50 uppercase tracking-wider mb-1.5 block">Description</label>
-            <textarea value={form.desc} onChange={e => setForm(f => ({ ...f, desc: e.target.value }))} placeholder="Brief course description..." rows={3} className="input-field resize-none" />
-          </div>
-
-          {/* Category */}
-          <div>
-            <label className="text-xs text-white/50 uppercase tracking-wider mb-1.5 block">Category *</label>
-            <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="input-field">
-              <option value="">Select category...</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-
-          {/* Thumbnail */}
-          <div>
-            <label className="text-xs text-white/50 uppercase tracking-wider mb-1.5 block">Thumbnail</label>
-            {form.thumbnail ? (
-              <div className="flex items-center gap-3">
-                <div className="w-20 h-14 rounded-xl bg-white/[0.06] overflow-hidden flex items-center justify-center">
-                  <img src={form.thumbnail} alt="thumb" className="w-full h-full object-cover" />
-                </div>
-                <button type="button" onClick={() => setForm(f => ({ ...f, thumbnail: "" }))} className="text-sm text-red-400 hover:text-red-300">Remove thumbnail</button>
-              </div>
-            ) : (
-              <label className="flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-white/20 hover:border-white/40 cursor-pointer transition-colors">
-                <Upload size={16} className="text-white/40" />
-                <span className="text-sm text-white/40">Choose File</span>
-                <input type="file" accept="image/*" className="hidden" onChange={e => {
-                  const file = e.target.files?.[0];
-                  if (file) setForm(f => ({ ...f, thumbnail: URL.createObjectURL(file) }));
-                }} />
-              </label>
-            )}
-          </div>
-
-          {/* Module count */}
-          <div>
-            <label className="text-xs text-white/50 uppercase tracking-wider mb-3 block">Number of Modules</label>
-            <div className="flex items-center gap-5">
-              <button type="button" onClick={() => handleModuleCount(-1)} disabled={moduleCount <= 1} className="w-10 h-10 rounded-xl border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-purple-600/40 transition-all disabled:opacity-30">
-                <Minus size={16} />
-              </button>
-              <span className="text-4xl font-black text-red-400 w-12 text-center">{moduleCount}</span>
-              <button type="button" onClick={() => handleModuleCount(1)} disabled={moduleCount >= 20} className="w-10 h-10 rounded-xl border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-purple-600/40 transition-all disabled:opacity-30">
-                <Plus size={16} />
-              </button>
+            {/* Course Title */}
+            <div>
+              <label style={LABEL}>Course Title *</label>
+              <input
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="e.g. Artificial Intelligence Fundamentals"
+                style={INPUT}
+                onFocus={focusStyle} onBlur={blurStyle}
+              />
             </div>
-          </div>
 
-          {/* Module names */}
-          <div className="space-y-2">
-            <label className="text-xs text-white/50 uppercase tracking-wider block">Module Names</label>
-            {moduleNames.map((name, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <span className="w-7 h-7 rounded-lg bg-purple-600/20 text-purple-400 text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+            {/* Description */}
+            <div>
+              <label style={LABEL}>Description *</label>
+              <textarea
+                value={form.desc}
+                onChange={e => setForm(f => ({ ...f, desc: e.target.value }))}
+                placeholder="Describe what students will learn in this course..."
+                rows={4}
+                style={{ ...INPUT, resize: "none", lineHeight: "1.6" }}
+                onFocus={focusStyle} onBlur={blurStyle}
+              />
+            </div>
+
+            {/* Category */}
+            <div>
+              <label style={LABEL}>Category</label>
+              <select
+                value={form.category}
+                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                style={{ ...INPUT, appearance: "none", cursor: "pointer" }}
+                onFocus={focusStyle} onBlur={blurStyle}
+              >
+                <option value="" style={{ background: "#111" }}>Select category...</option>
+                {CATEGORIES.map(c => <option key={c} value={c} style={{ background: "#111" }}>{c}</option>)}
+              </select>
+            </div>
+
+            {/* Videos + Quizzes row */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div>
+                <label style={LABEL}>Videos per module</label>
                 <input
-                  value={name}
-                  onChange={e => { const n = [...moduleNames]; n[i] = e.target.value; setModuleNames(n); }}
-                  placeholder={`Module ${i + 1} title`}
-                  className="input-field flex-1"
+                  type="number" min={0} max={50}
+                  value={form.videos || ""}
+                  onChange={e => setForm(f => ({ ...f, videos: parseInt(e.target.value) || 0 }))}
+                  placeholder="e.g. 3"
+                  style={INPUT}
+                  onFocus={focusStyle} onBlur={blurStyle}
                 />
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Preview */}
-        {form.title && (
-          <div className="glass-card p-4">
-            <p className="text-xs text-white/40 uppercase tracking-wider mb-2">Preview</p>
-            <h3 className="font-bold text-white mb-2">{form.title}</h3>
-            <div className="flex flex-wrap gap-2">
-              {form.category && <span className="badge-purple">{form.category}</span>}
-              {moduleNames.filter(Boolean).map((n, i) => (
-                <span key={i} className="text-xs px-2 py-1 rounded-full border border-white/[0.08] text-white/50">M{i + 1}: {n.slice(0, 20)}</span>
-              ))}
+              <div>
+                <label style={LABEL}>Quizzes per module</label>
+                <input
+                  type="number" min={0} max={50}
+                  value={form.quizzes || ""}
+                  onChange={e => setForm(f => ({ ...f, quizzes: parseInt(e.target.value) || 0 }))}
+                  placeholder="e.g. 5"
+                  style={INPUT}
+                  onFocus={focusStyle} onBlur={blurStyle}
+                />
+              </div>
             </div>
-          </div>
-        )}
 
-        <button type="submit" disabled={loading} className="btn-primary w-full py-3 flex items-center justify-center gap-2">
-          {loading ? <><Loader2 size={15} className="animate-spin-slow" /> Creating...</> : <><Plus size={16} /> Create Course</>}
-        </button>
-      </form>
+            {/* Thumbnail */}
+            <div>
+              <label style={LABEL}>Thumbnail (optional)</label>
+              {/* Tab switcher */}
+              <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                {([["youtube", PlayCircle, "YouTube URL"], ["upload", Upload, "Upload Image"]] as const).map(([key, Icon, label]) => (
+                  <button key={key} type="button" onClick={() => setThumbTab(key as "youtube" | "upload")}
+                    style={{ display: "flex", alignItems: "center", gap: "7px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer", border: "none", background: thumbTab === key ? "rgba(124,58,237,0.35)" : "rgba(255,255,255,0.05)", color: thumbTab === key ? "#C4B5FD" : "rgba(255,255,255,0.4)", transition: "all .15s" }}>
+                    <Icon size={14} /> {label}
+                  </button>
+                ))}
+              </div>
+              {thumbTab === "youtube" ? (
+                <div style={{ position: "relative" }}>
+                  <div style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.25)", pointerEvents: "none" }}>
+                    <PlayCircle size={16} />
+                  </div>
+                  <input
+                    value={youtubeUrl}
+                    onChange={e => setYoutubeUrl(e.target.value)}
+                    placeholder="https://youtube.com/watch?v=..."
+                    style={{ ...INPUT, paddingLeft: "44px" }}
+                    onFocus={focusStyle} onBlur={blurStyle}
+                  />
+                </div>
+              ) : (
+                <label style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", background: INPUT_BG, border: `1.5px dashed rgba(255,255,255,0.15)`, borderRadius: "10px", cursor: "pointer", transition: "border-color .15s" }}
+                  onMouseEnter={e => (e.currentTarget as HTMLLabelElement).style.borderColor = "rgba(124,58,237,0.5)"}
+                  onMouseLeave={e => (e.currentTarget as HTMLLabelElement).style.borderColor = "rgba(255,255,255,0.15)"}>
+                  <Upload size={18} style={{ color: "rgba(255,255,255,0.3)" }} />
+                  <span style={{ color: "rgba(255,255,255,0.35)", fontSize: "14px" }}>Click to choose an image file</span>
+                  <input type="file" accept="image/*" style={{ display: "none" }} />
+                </label>
+              )}
+              {thumbTab === "youtube" && <p style={{ color: "rgba(255,255,255,0.25)", fontSize: "12px", marginTop: "6px" }}>Paste any YouTube video URL — its thumbnail image will be used as the course cover.</p>}
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: "1px", background: "rgba(255,255,255,0.07)" }} />
+
+            {/* Module count */}
+            <div>
+              <label style={LABEL}>How many modules? *</label>
+              <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+                <button type="button" onClick={() => handleModuleCount(-1)} disabled={moduleCount <= 1}
+                  style={{ width: "40px", height: "40px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: moduleCount <= 1 ? 0.3 : 1, flexShrink: 0 }}>
+                  <Minus size={16} />
+                </button>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+                  <span style={{ fontSize: "42px", fontWeight: 900, color: "#A78BFA", lineHeight: 1 }}>{moduleCount}</span>
+                  <span style={{ color: "rgba(255,255,255,0.35)", fontSize: "14px" }}>modules</span>
+                </div>
+                <button type="button" onClick={() => handleModuleCount(1)} disabled={moduleCount >= 20}
+                  style={{ width: "40px", height: "40px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: moduleCount >= 20 ? 0.3 : 1, flexShrink: 0 }}>
+                  <Plus size={16} />
+                </button>
+              </div>
+              <p style={{ color: "rgba(255,255,255,0.25)", fontSize: "12px", marginTop: "8px" }}>{moduleCount} module{moduleCount !== 1 ? "s" : ""} will be created. You can add videos &amp; questions to each module after.</p>
+            </div>
+
+            {/* Module Names */}
+            <div>
+              <label style={LABEL}>Module Names</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {moduleNames.map((name, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <span style={{ width: "28px", height: "28px", borderRadius: "50%", background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.35)", color: "#A78BFA", fontSize: "12px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
+                    <input
+                      value={name}
+                      onChange={e => { const n = [...moduleNames]; n[i] = e.target.value; setModuleNames(n); }}
+                      placeholder={`Module ${i + 1}`}
+                      style={{ ...INPUT, flex: 1 }}
+                      onFocus={focusStyle} onBlur={blurStyle}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Submit */}
+          <button type="submit" disabled={loading}
+            style={{ marginTop: "20px", width: "100%", padding: "16px", borderRadius: "12px", background: "linear-gradient(135deg,#7C3AED,#6D28D9)", color: "#fff", fontSize: "15px", fontWeight: 700, border: "none", cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", boxShadow: "0 4px 24px rgba(124,58,237,0.4)", opacity: loading ? 0.7 : 1, transition: "opacity .15s" }}>
+            {loading ? <><Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Creating...</> : <><Plus size={16} /> Create Course</>}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

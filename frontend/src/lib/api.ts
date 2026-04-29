@@ -61,6 +61,7 @@ export interface Course {
   enrolled?: boolean;
   progress?: number;
   completed?: boolean;
+  is_published?: boolean;
 }
 
 export interface Certificate {
@@ -81,6 +82,60 @@ export interface LeaderboardEntry {
   points: number;
   courses_completed: number;
   certificates: number;
+  is_current_user?: boolean;
+}
+
+export interface ModuleVideo {
+  idx: number;
+  youtube_id: string;
+  title: string;
+  watched: boolean;
+}
+
+export interface CourseModule {
+  num: number;
+  title: string;
+  videos: ModuleVideo[];
+  completed: boolean;
+  unlocked: boolean;
+  score: number | null;
+}
+
+export interface AdminVideo {
+  idx: number;
+  title: string;
+  youtube_id: string;
+}
+
+export interface AdminQuestion {
+  idx: number;
+  q: string;
+  opts: string[];
+  correct: number;
+  exp: string;
+}
+
+export interface AdminModule {
+  num: number;
+  title: string;
+  videos: AdminVideo[];
+  questions: AdminQuestion[];
+}
+
+export interface QuizQuestion {
+  idx: number;
+  q: string;
+  opts: string[];
+  correct: number;
+  exp: string;
+}
+
+export interface TestResult {
+  score: number;
+  passed: boolean;
+  correct: number;
+  total: number;
+  progress: number | null;
 }
 
 export interface Student {
@@ -166,7 +221,7 @@ export const api = {
   courses: {
     list: () => request<Course[]>("/courses"),
     get: (id: string) => request<Course>(`/courses/${id}`),
-    create: (data: Omit<Course, "id" | "students" | "grad" | "accent">) =>
+    create: (data: Omit<Course, "id" | "students" | "grad" | "accent"> & { module_names?: string[] }) =>
       request<Course>("/courses", { method: "POST", body: JSON.stringify(data) }),
     update: (id: string, data: Partial<Course>) =>
       request<Course>(`/courses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
@@ -177,6 +232,32 @@ export const api = {
       request<{ message: string; progress: number; completed_modules: number; completed: boolean }>(
         `/courses/${courseId}/modules/${moduleNum}/complete`,
         { method: "POST" }
+      ),
+    adminList: () => request<Course[]>("/admin/courses"),
+    togglePublish: (id: string) =>
+      request<{ is_published: boolean }>(`/courses/${id}/publish`, { method: "POST" }),
+  },
+
+  /** Modules */
+  modules: {
+    list: (courseId: string) => request<CourseModule[]>(`/courses/${courseId}/modules`),
+    adminList: (courseId: string) => request<AdminModule[]>(`/admin/courses/${courseId}/modules`),
+    getQuestions: (courseId: string, moduleNum: number) =>
+      request<QuizQuestion[]>(`/courses/${courseId}/modules/${moduleNum}/questions`),
+    submitTest: (courseId: string, moduleNum: number, answers: number[]) =>
+      request<TestResult>(`/courses/${courseId}/modules/${moduleNum}/test`, {
+        method: "POST",
+        body: JSON.stringify({ answers }),
+      }),
+    saveVideos: (courseId: string, moduleNum: number, videos: { title: string; youtube_id: string }[]) =>
+      request<{ message: string; count: number }>(
+        `/admin/courses/${courseId}/modules/${moduleNum}/videos`,
+        { method: "PUT", body: JSON.stringify({ videos }) }
+      ),
+    saveQuestions: (courseId: string, moduleNum: number, questions: { q: string; opts: string[]; correct: number; exp: string }[]) =>
+      request<{ message: string; count: number }>(
+        `/admin/courses/${courseId}/modules/${moduleNum}/questions`,
+        { method: "PUT", body: JSON.stringify({ questions }) }
       ),
   },
 

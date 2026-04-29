@@ -42,7 +42,7 @@ export default function VerifyPage({ params }: { params: { code: string } }) {
             Certificate Verification
           </div>
           <h1 className="text-2xl font-bold text-white">Verify Certificate</h1>
-          <p className="text-sm text-white/50 mt-1">Check the authenticity of an AI-DS Academy certificate.</p>
+          <p className="text-sm text-white/50 mt-1">Check the authenticity of an EduPath certificate.</p>
         </div>
 
         {/* Result card */}
