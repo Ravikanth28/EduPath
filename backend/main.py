@@ -1498,6 +1498,35 @@ def get_leaderboard(current_user: User = Depends(get_current_user), db: Session 
 
 def list_certificates(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
 
+    if current_user.role != "admin":
+
+        # Auto-generate any missing certificates for completed enrollments
+        completed = (
+            db.query(Enrollment, Course)
+            .join(Course, Enrollment.course_id == Course.id)
+            .filter(Enrollment.user_id == current_user.id, Enrollment.progress == 100)
+            .all()
+        )
+        for enroll, course in completed:
+            exists = db.query(Certificate).filter(
+                Certificate.student_id == current_user.id,
+                Certificate.course_name == course.title,
+            ).first()
+            if not exists:
+                db.add(Certificate(
+                    id=f"CERT-{uuid.uuid4().hex[:8].upper()}",
+                    course_name=course.title,
+                    category=course.category,
+                    student_id=current_user.id,
+                    issued_date=datetime.utcnow().strftime("%B %d, %Y"),
+                    status="verified",
+                    grad=course.grad,
+                    accent=course.accent,
+                    accent_dim="rgba(124,58,237,0.12)",
+                    accent_border="rgba(124,58,237,0.3)",
+                ))
+        db.commit()
+
     if current_user.role == "admin":
 
         certs = db.query(Certificate).all()
