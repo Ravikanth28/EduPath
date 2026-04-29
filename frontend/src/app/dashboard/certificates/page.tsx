@@ -31,7 +31,7 @@ async function downloadCertAsPDF(studentName: string, courseName: string, issued
   const { jsPDF } = await import("jspdf");
   // cert-bg.jpeg: 1042×727, ratio 1.4333
   const W = 297;
-  const H = Math.round(W / (1042 / 727)); // ≈ 207mm
+  const H = Math.round(W / (1042 / 727));
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: [W, H] });
 
   // Load blank SMVEC template
@@ -44,6 +44,10 @@ async function downloadCertAsPDF(studentName: string, courseName: string, issued
   const CX = W * 0.57;
 
   // "This is to certify that" — italic, gray
+  doc.setFillColor(255, 255, 255);
+  doc.rect(W * 0.20, H * 0.305, W * 0.80, H * 0.19, "F");
+  doc.rect(W * 0.20, H * 0.50, W * 0.80, H * 0.035, "F");
+
   doc.setFont("times", "italic");
   doc.setFontSize(14);
   doc.setTextColor(80, 80, 80);
@@ -51,16 +55,16 @@ async function downloadCertAsPDF(studentName: string, courseName: string, issued
 
   // Student name — large bold navy
   doc.setFont("times", "bold");
-  doc.setFontSize(40);
+  doc.setFontSize(38);
   doc.setTextColor(8, 18, 65);
   doc.text(studentName, CX, H * 0.555, { align: "center" });
 
-  // "has successfully completed the course" — italic navy
   doc.setFont("times", "italic");
   doc.setFontSize(15);
   doc.setTextColor(8, 18, 65);
   doc.text("has successfully completed the course", CX, H * 0.645, { align: "center" });
 
+  // "has successfully completed the course" — italic navy
   // Course name — bold navy
   doc.setFont("times", "bold");
   doc.setFontSize(24);
@@ -68,29 +72,29 @@ async function downloadCertAsPDF(studentName: string, courseName: string, issued
   doc.text(courseName, CX, H * 0.725, { align: "center" });
 
   // Description — italic gray
+  // Footer labels
   doc.setFont("times", "italic");
   doc.setFontSize(12);
   doc.setTextColor(80, 80, 80);
   doc.text("with distinction, showcasing excellence throughout.", CX, H * 0.80, { align: "center" });
 
-  // Footer labels
-  const xDate = W * 0.38, xCert = W * 0.57, xSign = W * 0.80;
+  const xDate = W * 0.36, xCert = W * 0.57, xSign = W * 0.80;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7);
   doc.setTextColor(110, 100, 80);
-  doc.text("DATE ISSUED",          xDate, H * 0.867, { align: "center" });
-  doc.text("CERTIFICATE ID",       xCert, H * 0.867, { align: "center" });
+  doc.text("DATE ISSUED", xDate, H * 0.867, { align: "center" });
+  doc.text("CERTIFICATE ID", xCert, H * 0.867, { align: "center" });
   doc.text("AUTHORISED SIGNATURE", xSign, H * 0.867, { align: "center" });
 
   // Footer values
   doc.setFont("times", "bold");
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setTextColor(8, 18, 65);
   doc.text(issuedDate, xDate, H * 0.91, { align: "center" });
-  doc.text(certId,     xCert, H * 0.91, { align: "center" });
+  doc.text(certId, xCert, H * 0.91, { align: "center" });
 
   // Verified badge
-  const bw = 58, bh = 11;
+  const bw = 64, bh = 11;
   doc.setFillColor(236, 253, 243);
   doc.setDrawColor(34, 160, 80);
   doc.setLineWidth(0.8);
@@ -118,10 +122,10 @@ export default function CertificatesPage() {
   };
 
   return (
-    <div style={{ padding: "28px 24px", display: "flex", flexDirection: "column", gap: "24px" }}>
+    <div style={{ padding: "clamp(16px, 3vw, 28px) clamp(12px, 3vw, 24px)", display: "flex", flexDirection: "column", gap: "24px" }}>
 
       {/* Header */}
-      <div style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.20)", borderRadius: "20px", padding: "24px 28px", display: "flex", alignItems: "center", gap: "20px", position: "relative", overflow: "hidden" }}>
+      <div style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.20)", borderRadius: "20px", padding: "clamp(18px, 3vw, 24px) clamp(16px, 3vw, 28px)", display: "flex", alignItems: "center", gap: "16px", position: "relative", overflow: "hidden", flexWrap: "wrap" }}>
         <div style={{ position: "absolute", top: "-60px", right: "-60px", width: "220px", height: "220px", background: "radial-gradient(circle,rgba(124,58,237,0.18),transparent 60%)", borderRadius: "50%", pointerEvents: "none" }} />
         <div style={{ width: "60px", height: "60px", borderRadius: "18px", background: "rgba(167,139,250,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 0 0 1px rgba(167,139,250,0.25)", position: "relative", zIndex: 1 }}>
           <Trophy size={30} style={{ color: "#A78BFA" }} />
@@ -146,7 +150,7 @@ export default function CertificatesPage() {
           <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.3)", margin: 0 }}>Complete a course and pass all module tests to earn a certificate.</p>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))", gap: "20px" }}>
           {CERTS.map(c => {
             const st = STATUS_MAP[c.status];
             return (
@@ -202,10 +206,10 @@ export default function CertificatesPage() {
       {/* View modal — matches template.png exactly */}
       {viewModal && (
         <div
-          style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
+          style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(10px)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "clamp(12px, 3vw, 24px)", overflowY: "auto" }}
           onClick={() => setViewModal(null)}
         >
-          <div style={{ position: "relative", width: "100%", maxWidth: "960px" }} onClick={e => e.stopPropagation()}>
+          <div style={{ position: "relative", width: "min(100%, 1040px)", margin: "auto 0" }} onClick={e => e.stopPropagation()}>
 
             {/* Close button */}
             <button
@@ -217,7 +221,7 @@ export default function CertificatesPage() {
 
             {/* Certificate: blank template + text overlays matching template.png exactly */}
             {/* cert-bg.jpeg has "THIS CERTIFICATE IS PRESENTED TO" baked at y≈33-43% — masked with white */}
-            <div style={{ position: "relative", borderRadius: "10px", overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.75)" }}>
+            <div style={{ position: "relative", borderRadius: "10px", overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.75)", containerType: "inline-size" }}>
               <img src="/cert-bg.jpeg" alt="certificate" style={{ width: "100%", display: "block" }} />
 
               {/* WHITE MASK — covers the pre-printed "THIS CERTIFICATE IS PRESENTED TO" text */}
@@ -227,49 +231,49 @@ export default function CertificatesPage() {
               <div style={{ position: "absolute", top: "49%", left: "20%", right: "1%", height: "3%", background: "white", pointerEvents: "none" }} />
 
               {/* "This is to certify that" — italic serif, gray — y≈37% */}
+              {/* Student name — bold serif, large, dark navy — y≈44% */}
               <div style={{ position: "absolute", top: "37%", left: "57%", transform: "translateX(-50%)", width: "72%", textAlign: "center", pointerEvents: "none" }}>
-                <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontStyle: "italic", fontSize: "1.95vw", color: "#444" }}>This is to certify that</span>
+                <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontStyle: "italic", fontSize: "clamp(13px, 3.1cqw, 32px)", color: "#444" }}>This is to certify that</span>
               </div>
 
-              {/* Student name — bold serif, large, dark navy — y≈44% */}
               <div style={{ position: "absolute", top: "44%", left: "57%", transform: "translateX(-50%)", width: "72%", textAlign: "center", pointerEvents: "none" }}>
-                <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontWeight: "bold", fontSize: "4.4vw", color: "#08124a", display: "block", lineHeight: 1.1 }}>{viewModal.studentName}</span>
+                <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontWeight: "bold", fontSize: "clamp(28px, 6.5cqw, 66px)", color: "#08124a", display: "block", lineHeight: 1.02 }}>{viewModal.studentName}</span>
               </div>
 
               {/* "has successfully completed the course" — italic serif, dark navy — y≈57% */}
+              {/* Course name — bold serif, dark navy — y≈64.5% */}
               <div style={{ position: "absolute", top: "57%", left: "57%", transform: "translateX(-50%)", width: "72%", textAlign: "center", pointerEvents: "none" }}>
-                <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontStyle: "italic", fontSize: "1.6vw", color: "#08124a", display: "block" }}>has successfully completed the course</span>
+                <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontStyle: "italic", fontSize: "clamp(12px, 2.5cqw, 26px)", color: "#08124a", display: "block" }}>has successfully completed the course</span>
               </div>
 
-              {/* Course name — bold serif, dark navy — y≈64.5% */}
               <div style={{ position: "absolute", top: "64.5%", left: "57%", transform: "translateX(-50%)", width: "72%", textAlign: "center", pointerEvents: "none" }}>
-                <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontWeight: "bold", fontSize: "2.5vw", color: "#08124a", display: "block" }}>{viewModal.course}</span>
+                <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontWeight: "bold", fontSize: "clamp(18px, 3.9cqw, 40px)", color: "#08124a", display: "block", lineHeight: 1.05 }}>{viewModal.course}</span>
               </div>
 
               {/* "with distinction..." — italic serif, gray — y≈73% */}
+              {/* Footer labels — DATE ISSUED @ 38%, CERT ID @ 57%, AUTHORISED SIGNATURE @ 80% — y≈80.5% */}
               <div style={{ position: "absolute", top: "73%", left: "57%", transform: "translateX(-50%)", width: "68%", textAlign: "center", pointerEvents: "none" }}>
-                <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontStyle: "italic", fontSize: "1.15vw", color: "#555", display: "block" }}>with distinction, showcasing excellence throughout.</span>
+                <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontStyle: "italic", fontSize: "clamp(10px, 1.8cqw, 19px)", color: "#555", display: "block" }}>with distinction, showcasing excellence throughout.</span>
               </div>
 
-              {/* Footer labels — DATE ISSUED @ 38%, CERT ID @ 57%, AUTHORISED SIGNATURE @ 80% — y≈80.5% */}
-              <div style={{ position: "absolute", top: "80.5%", left: "38%", transform: "translateX(-50%)", textAlign: "center", pointerEvents: "none" }}>
-                <span style={{ display: "block", fontFamily: "Arial,sans-serif", fontWeight: 700, fontSize: "0.62vw", color: "#888", letterSpacing: "0.12em", textTransform: "uppercase" }}>Date Issued</span>
-                <span style={{ display: "block", fontFamily: "Georgia,'Times New Roman',serif", fontWeight: "bold", fontSize: "1.25vw", color: "#08124a", marginTop: "0.3vw" }}>{viewModal.issued}</span>
+              <div style={{ position: "absolute", top: "80.5%", left: "36%", transform: "translateX(-50%)", width: "20%", textAlign: "center", pointerEvents: "none" }}>
+                <span style={{ display: "block", fontFamily: "Arial,sans-serif", fontWeight: 700, fontSize: "clamp(6px, 1cqw, 10px)", color: "#888", letterSpacing: "0.12em", textTransform: "uppercase" }}>Date Issued</span>
+                <span style={{ display: "block", fontFamily: "Georgia,'Times New Roman',serif", fontWeight: "bold", fontSize: "clamp(10px, 1.9cqw, 20px)", color: "#08124a", marginTop: "0.3cqw", whiteSpace: "nowrap" }}>{viewModal.issued}</span>
               </div>
-              <div style={{ position: "absolute", top: "80.5%", left: "57%", transform: "translateX(-50%)", textAlign: "center", pointerEvents: "none" }}>
-                <span style={{ display: "block", fontFamily: "Arial,sans-serif", fontWeight: 700, fontSize: "0.62vw", color: "#888", letterSpacing: "0.12em", textTransform: "uppercase" }}>Certificate ID</span>
-                <span style={{ display: "block", fontFamily: "Georgia,'Times New Roman',serif", fontWeight: "bold", fontSize: "1.25vw", color: "#08124a", marginTop: "0.3vw" }}>{viewModal.id}</span>
+              <div style={{ position: "absolute", top: "80.5%", left: "57%", transform: "translateX(-50%)", width: "22%", textAlign: "center", pointerEvents: "none" }}>
+                <span style={{ display: "block", fontFamily: "Arial,sans-serif", fontWeight: 700, fontSize: "clamp(6px, 1cqw, 10px)", color: "#888", letterSpacing: "0.12em", textTransform: "uppercase" }}>Certificate ID</span>
+                <span style={{ display: "block", fontFamily: "Georgia,'Times New Roman',serif", fontWeight: "bold", fontSize: "clamp(10px, 1.9cqw, 20px)", color: "#08124a", marginTop: "0.3cqw", whiteSpace: "nowrap" }}>{viewModal.id}</span>
               </div>
-              <div style={{ position: "absolute", top: "80.5%", left: "80%", transform: "translateX(-50%)", textAlign: "center", pointerEvents: "none" }}>
-                <span style={{ display: "block", fontFamily: "Arial,sans-serif", fontWeight: 700, fontSize: "0.62vw", color: "#888", letterSpacing: "0.12em", textTransform: "uppercase" }}>Authorised</span>
-                <span style={{ display: "block", fontFamily: "Arial,sans-serif", fontWeight: 700, fontSize: "0.62vw", color: "#888", letterSpacing: "0.12em", textTransform: "uppercase" }}>Signature</span>
+              <div style={{ position: "absolute", top: "80.5%", left: "80%", transform: "translateX(-50%)", width: "18%", textAlign: "center", pointerEvents: "none" }}>
+                <span style={{ display: "block", fontFamily: "Arial,sans-serif", fontWeight: 700, fontSize: "clamp(6px, 1cqw, 10px)", color: "#888", letterSpacing: "0.12em", textTransform: "uppercase" }}>Authorised</span>
+                <span style={{ display: "block", fontFamily: "Arial,sans-serif", fontWeight: 700, fontSize: "clamp(6px, 1cqw, 10px)", color: "#888", letterSpacing: "0.12em", textTransform: "uppercase" }}>Signature</span>
               </div>
 
               {/* Verified badge — centered at 57%, y≈89% */}
               {viewModal.status === "verified" && (
-                <div style={{ position: "absolute", top: "89%", left: "57%", transform: "translateX(-50%)", background: "rgba(236,253,243,0.97)", border: "1.5px solid #22a050", borderRadius: "20px", padding: "0.3vw 1vw", display: "inline-flex", alignItems: "center", gap: "0.4vw", pointerEvents: "none", whiteSpace: "nowrap" }}>
+                <div style={{ position: "absolute", top: "89%", left: "57%", transform: "translateX(-50%)", background: "rgba(236,253,243,0.97)", border: "1.5px solid #22a050", borderRadius: "999px", padding: "0.45cqw 1.35cqw", display: "inline-flex", alignItems: "center", gap: "0.55cqw", pointerEvents: "none", whiteSpace: "nowrap" }}>
                   <CheckCircle size={11} color="#22a050" />
-                  <span style={{ fontFamily: "Arial,sans-serif", fontWeight: 700, fontSize: "0.8vw", color: "#16803c", letterSpacing: "0.08em" }}>VERIFIED CERTIFICATE</span>
+                  <span style={{ fontFamily: "Arial,sans-serif", fontWeight: 700, fontSize: "clamp(7px, 1.35cqw, 14px)", color: "#16803c", letterSpacing: "0.08em" }}>VERIFIED CERTIFICATE</span>
                 </div>
               )}
             </div>
