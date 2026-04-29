@@ -63,11 +63,19 @@ function SidebarContent({ pathname, onNavClick, onLogout, adminName }: { pathnam
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adminName, setAdminName]     = useState("");
   const [ready, setReady]             = useState(false);
   const pathname = usePathname();
   const router   = useRouter();
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 769px)");
+    const syncSidebar = () => setSidebarOpen(mq.matches);
+    syncSidebar();
+    mq.addEventListener("change", syncSidebar);
+    return () => mq.removeEventListener("change", syncSidebar);
+  }, []);
 
   useEffect(() => {
     if (!getToken()) { router.replace("/login"); return; }
@@ -92,7 +100,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "linear-gradient(135deg,#DDE7FF 0%,#EEF3FF 52%,#CAD8FF 100%)" }}>
 
       {/* Desktop sidebar - toggled by Menu button */}
-      <div style={{
+      <div className="admin-sidebar-wrap" style={{
         width: sidebarOpen ? "240px" : "0px",
         flexShrink: 0,
         overflow: "hidden",
@@ -101,12 +109,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         flexDirection: "column",
       }}>
         <div style={{ width: "240px", height: "100%" }}>
-          <SidebarContent pathname={pathname} onNavClick={() => {}} onLogout={handleLogout} adminName={adminName} />
+          <SidebarContent pathname={pathname} onNavClick={() => setSidebarOpen(false)} onLogout={handleLogout} adminName={adminName} />
         </div>
       </div>
 
+      {sidebarOpen && <div className="admin-mobile-scrim" onClick={() => setSidebarOpen(false)} />}
+
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(17,19,34,0.06)", background: "linear-gradient(180deg,rgba(238,243,255,0.98),rgba(225,232,255,0.94))", display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+        <div className="admin-topbar" style={{ padding: "12px 16px", borderBottom: "1px solid rgba(17,19,34,0.06)", background: "linear-gradient(180deg,rgba(238,243,255,0.98),rgba(225,232,255,0.94))", display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
           <button onClick={() => setSidebarOpen(o => !o)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(17,19,34,0.6)", padding: "6px", display: "flex", borderRadius: "8px" }}>
             <Menu size={18} />
           </button>

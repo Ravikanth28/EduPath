@@ -96,8 +96,11 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#050508" }}>
 
-      {/* Desktop sidebar - hidden on course pages */}
-      <div style={{ width: pathname.startsWith("/dashboard/courses/") ? "0" : "240px", flexShrink: 0, display: "flex", flexDirection: "column", overflow: "hidden", transition: "width .25s ease" }}>
+      {/* Desktop sidebar - hidden on course pages and on mobile */}
+      <div
+        className="desktop-sidebar-wrap"
+        style={{ width: pathname.startsWith("/dashboard/courses/") ? "0" : "240px" }}
+      >
         <SidebarContent pathname={pathname} onNavClick={() => {}} onLogout={handleSignOut} userName={userName} userEmail={userEmail} />
       </div>
 
@@ -114,7 +117,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
       {/* Main area */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
         {/* Mobile top bar */}
-        <div style={{ display: "none" }} className="mobile-bar">
+        <div className="mobile-bar">
           <button onClick={() => setMobileOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", padding: "8px", display: "flex" }}>
             <Menu size={20} />
           </button>
@@ -124,6 +127,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
             </div>
             <span style={{ fontWeight: 800, color: "#fff", fontSize: "14px" }}>EduPath</span>
           </div>
+          <div style={{ width: "36px" }} />
         </div>
 
         <main style={{ flex: 1, overflowY: "auto" }}>
