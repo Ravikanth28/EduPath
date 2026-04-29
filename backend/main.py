@@ -62,20 +62,17 @@ load_dotenv()
 
 app = FastAPI(title="EduPath API", version="1.0.0")
 
-
+_raw_origins = os.getenv("FRONTEND_URL", "http://localhost:3000")
+_allowed_origins = [o.strip() for o in _raw_origins.split(",")]
+if "http://localhost:3000" not in _allowed_origins:
+    _allowed_origins.append("http://localhost:3000")
 
 app.add_middleware(
-
     CORSMiddleware,
-
-    allow_origins=["http://localhost:3000"],
-
+    allow_origins=_allowed_origins,
     allow_credentials=True,
-
     allow_methods=["*"],
-
     allow_headers=["*"],
-
 )
 
 
