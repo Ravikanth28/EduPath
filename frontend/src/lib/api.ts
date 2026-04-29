@@ -1,5 +1,12 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+export const DEFAULT_MODULE_SETTINGS = {
+  pass_percentage: 70,
+  questions_per_test: 0,
+  shuffle_questions: false,
+  show_explanations: true,
+} as const;
+
 // ─── Token helpers ────────────────────────────────────────────────────────────
 export function saveToken(token: string) {
   if (typeof window !== "undefined") localStorage.setItem("edupath_token", token);
@@ -96,6 +103,10 @@ export interface ModuleVideo {
 export interface CourseModule {
   num: number;
   title: string;
+  pass_percentage: number;
+  questions_per_test: number;
+  shuffle_questions: boolean;
+  show_explanations: boolean;
   videos: ModuleVideo[];
   completed: boolean;
   unlocked: boolean;
@@ -119,6 +130,10 @@ export interface AdminQuestion {
 export interface AdminModule {
   num: number;
   title: string;
+  pass_percentage: number;
+  questions_per_test: number;
+  shuffle_questions: boolean;
+  show_explanations: boolean;
   videos: AdminVideo[];
   questions: AdminQuestion[];
 }
@@ -137,6 +152,7 @@ export interface TestResult {
   correct: number;
   total: number;
   progress: number | null;
+  passing_score: number;
 }
 
 export interface Student {
@@ -245,10 +261,15 @@ export const api = {
     adminList: (courseId: string) => request<AdminModule[]>(`/admin/courses/${courseId}/modules`),
     getQuestions: (courseId: string, moduleNum: number) =>
       request<QuizQuestion[]>(`/courses/${courseId}/modules/${moduleNum}/questions`),
-    submitTest: (courseId: string, moduleNum: number, answers: number[]) =>
+    markVideoWatched: (courseId: string, moduleNum: number, videoIdx: number) =>
+      request<{ watched: boolean; module_unlocked_for_test: boolean }>(
+        `/courses/${courseId}/modules/${moduleNum}/videos/${videoIdx}/watch`,
+        { method: "POST" }
+      ),
+    submitTest: (courseId: string, moduleNum: number, answers: number[], questionIds: number[] = []) =>
       request<TestResult>(`/courses/${courseId}/modules/${moduleNum}/test`, {
         method: "POST",
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({ answers, question_ids: questionIds }),
       }),
     saveVideos: (courseId: string, moduleNum: number, videos: { title: string; youtube_id: string }[]) =>
       request<{ message: string; count: number }>(
@@ -259,6 +280,15 @@ export const api = {
       request<{ message: string; count: number }>(
         `/admin/courses/${courseId}/modules/${moduleNum}/questions`,
         { method: "PUT", body: JSON.stringify({ questions }) }
+      ),
+    saveSettings: (
+      courseId: string,
+      moduleNum: number,
+      settings: { pass_percentage: number; questions_per_test: number; shuffle_questions: boolean; show_explanations: boolean }
+    ) =>
+      request<{ message: string; pass_percentage: number; questions_per_test: number; shuffle_questions: boolean; show_explanations: boolean }>(
+        `/admin/courses/${courseId}/modules/${moduleNum}/settings`,
+        { method: "PUT", body: JSON.stringify(settings) }
       ),
   },
 

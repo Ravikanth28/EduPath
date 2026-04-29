@@ -44,7 +44,9 @@ from database import (
 
     User, get_db, init_db,
 
-    CourseModule, ModuleVideo, ModuleQuestion,
+    CourseModule, ModuleVideo, ModuleVideoProgress, ModuleQuestion,
+    DEFAULT_PASS_PERCENTAGE, DEFAULT_QUESTIONS_PER_TEST,
+    DEFAULT_SHUFFLE_QUESTIONS, DEFAULT_SHOW_EXPLANATIONS,
 
 )
 
@@ -84,6 +86,46 @@ app.add_middleware(
 def startup() -> None:
 
     init_db()
+
+
+def module_settings_payload(module: CourseModule) -> dict:
+    return {
+        "pass_percentage": module.pass_percentage or DEFAULT_PASS_PERCENTAGE,
+        "questions_per_test": module.questions_per_test or DEFAULT_QUESTIONS_PER_TEST,
+        "shuffle_questions": bool(module.shuffle_questions),
+        "show_explanations": DEFAULT_SHOW_EXPLANATIONS if module.show_explanations is None else bool(module.show_explanations),
+    }
+
+
+def watched_video_indexes(db: Session, user_id: str, course_id: str, module_num: int) -> set[int]:
+    rows = db.query(ModuleVideoProgress.video_idx).filter(
+        ModuleVideoProgress.user_id == user_id,
+        ModuleVideoProgress.course_id == course_id,
+        ModuleVideoProgress.module_num == module_num,
+    ).all()
+    return {idx for (idx,) in rows}
+
+
+def has_watched_all_module_videos(db: Session, user_id: str, course_id: str, module_num: int) -> bool:
+    videos = db.query(ModuleVideo.idx).filter(
+        ModuleVideo.course_id == course_id,
+        ModuleVideo.module_num == module_num,
+    ).all()
+    if not videos:
+        return False
+    watched = watched_video_indexes(db, user_id, course_id, module_num)
+    return all(idx in watched for (idx,) in videos)
+
+
+def is_module_completed(db: Session, user_id: str, course: Course, module_num: int) -> bool:
+    enroll = db.query(Enrollment).filter(
+        Enrollment.user_id == user_id,
+        Enrollment.course_id == course.id,
+    ).first()
+    if not enroll:
+        return False
+    completed_count = round(((enroll.progress or 0) / 100) * course.modules_count)
+    return module_num <= completed_count
 
 
 
@@ -890,6 +932,10 @@ def create_course(
             course_id=course.id,
             num=i + 1,
             title=name,
+            pass_percentage=DEFAULT_PASS_PERCENTAGE,
+            questions_per_test=DEFAULT_QUESTIONS_PER_TEST,
+            shuffle_questions=DEFAULT_SHUFFLE_QUESTIONS,
+            show_explanations=DEFAULT_SHOW_EXPLANATIONS,
         )
         db.add(mod)
 
@@ -1087,6 +1133,7 @@ def admin_get_modules(
         result.append({
             "num": m.num,
             "title": m.title,
+            **module_settings_payload(m),
             "videos": [{"idx": v.idx, "title": v.title, "youtube_id": v.youtube_id} for v in videos],
             "questions": [
                 {"idx": q.idx, "q": q.question, "opts": [q.option_a, q.option_b, q.option_c, q.option_d], "correct": q.correct_idx, "exp": q.explanation}
@@ -1159,6 +1206,38 @@ def admin_save_questions(
     return {"message": "Questions saved", "count": len(data.questions)}
 
 
+class ModuleSettingsRequest(BaseModel):
+    pass_percentage: int
+    questions_per_test: int
+    shuffle_questions: bool
+    show_explanations: bool
+
+
+@app.put("/admin/courses/{course_id}/modules/{module_num}/settings")
+def admin_save_module_settings(
+    course_id: str,
+    module_num: int,
+    data: ModuleSettingsRequest,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    module = db.query(CourseModule).filter(
+        CourseModule.course_id == course_id,
+        CourseModule.num == module_num,
+    ).first()
+    if not module:
+        raise HTTPException(404, "Module not found")
+    module.pass_percentage = max(1, min(100, int(data.pass_percentage or DEFAULT_PASS_PERCENTAGE)))
+    module.questions_per_test = max(0, int(data.questions_per_test or DEFAULT_QUESTIONS_PER_TEST))
+    module.shuffle_questions = bool(data.shuffle_questions)
+    module.show_explanations = bool(data.show_explanations)
+    db.commit()
+    return {
+        "message": "Settings saved",
+        **module_settings_payload(module),
+    }
+
+
 @app.get("/courses/{course_id}/modules")
 def get_course_modules(
     course_id: str,
@@ -1192,15 +1271,49 @@ def get_course_modules(
         )
         completed = m.num <= completed_count
         unlocked  = m.num <= current_module
+        watched = watched_video_indexes(db, current_user.id, course_id, m.num)
         result.append({
             "num":       m.num,
             "title":     m.title,
-            "videos":    [{"idx": v.idx, "youtube_id": v.youtube_id, "title": v.title, "watched": completed} for v in videos],
+            **module_settings_payload(m),
+            "videos":    [{"idx": v.idx, "youtube_id": v.youtube_id, "title": v.title, "watched": completed or v.idx in watched} for v in videos],
             "completed": completed,
             "unlocked":  unlocked,
             "score":     (80 + (m.num * 7) % 15) if completed else None,
         })
     return result
+
+
+@app.post("/courses/{course_id}/modules/{module_num}/videos/{video_idx}/watch")
+def mark_module_video_watched(
+    course_id: str,
+    module_num: int,
+    video_idx: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    video = db.query(ModuleVideo).filter(
+        ModuleVideo.course_id == course_id,
+        ModuleVideo.module_num == module_num,
+        ModuleVideo.idx == video_idx,
+    ).first()
+    if not video:
+        raise HTTPException(404, "Video not found")
+    exists = db.query(ModuleVideoProgress).filter(
+        ModuleVideoProgress.user_id == current_user.id,
+        ModuleVideoProgress.course_id == course_id,
+        ModuleVideoProgress.module_num == module_num,
+        ModuleVideoProgress.video_idx == video_idx,
+    ).first()
+    if not exists:
+        db.add(ModuleVideoProgress(
+            user_id=current_user.id,
+            course_id=course_id,
+            module_num=module_num,
+            video_idx=video_idx,
+        ))
+        db.commit()
+    return {"watched": True, "module_unlocked_for_test": has_watched_all_module_videos(db, current_user.id, course_id, module_num)}
 
 
 @app.get("/courses/{course_id}/modules/{module_num}/questions")
@@ -1210,6 +1323,17 @@ def get_module_questions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(404, "Course not found")
+    module = db.query(CourseModule).filter(
+        CourseModule.course_id == course_id,
+        CourseModule.num == module_num,
+    ).first()
+    if not module:
+        raise HTTPException(404, "Module not found")
+    if not is_module_completed(db, current_user.id, course, module_num) and not has_watched_all_module_videos(db, current_user.id, course_id, module_num):
+        raise HTTPException(403, "Watch all videos in this module before taking the test")
     questions = (
         db.query(ModuleQuestion)
         .filter(ModuleQuestion.course_id == course_id, ModuleQuestion.module_num == module_num)
@@ -1218,6 +1342,11 @@ def get_module_questions(
     )
     if not questions:
         raise HTTPException(404, "No questions found for this module")
+    settings = module_settings_payload(module)
+    if settings["shuffle_questions"]:
+        questions = random.sample(questions, len(questions))
+    if settings["questions_per_test"] > 0:
+        questions = questions[:settings["questions_per_test"]]
     return [
         {
             "idx":     q.idx,
@@ -1232,6 +1361,7 @@ def get_module_questions(
 
 class TestSubmitRequest(BaseModel):
     answers: list[int]
+    question_ids: Optional[list[int]] = None
 
 
 @app.post("/courses/{course_id}/modules/{module_num}/test")
@@ -1245,19 +1375,33 @@ def submit_module_test(
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(404, "Course not found")
-    questions = (
+    module = db.query(CourseModule).filter(
+        CourseModule.course_id == course_id,
+        CourseModule.num == module_num,
+    ).first()
+    if not module:
+        raise HTTPException(404, "Module not found")
+    if not is_module_completed(db, current_user.id, course, module_num) and not has_watched_all_module_videos(db, current_user.id, course_id, module_num):
+        raise HTTPException(403, "Watch all videos in this module before taking the test")
+    questions_query = (
         db.query(ModuleQuestion)
         .filter(ModuleQuestion.course_id == course_id, ModuleQuestion.module_num == module_num)
         .order_by(ModuleQuestion.idx)
-        .all()
     )
+    questions = questions_query.all()
     if not questions:
         raise HTTPException(404, "No questions found for this module")
+    if data.question_ids:
+        by_idx = {q.idx: q for q in questions}
+        questions = [by_idx[idx] for idx in data.question_ids if idx in by_idx]
+        if len(questions) != len(data.question_ids):
+            raise HTTPException(400, "Question set mismatch")
     if len(data.answers) != len(questions):
         raise HTTPException(400, "Answer count mismatch")
+    settings = module_settings_payload(module)
     correct = sum(1 for i, q in enumerate(questions) if data.answers[i] == q.correct_idx)
     score   = round((correct / len(questions)) * 100)
-    passed  = score >= 70
+    passed  = score >= settings["pass_percentage"]
     progress = None
     if passed:
         enroll = db.query(Enrollment).filter(
@@ -1304,7 +1448,14 @@ def submit_module_test(
             detail=f"Passed Module {module_num} test in {course.title} — Score: {score}%",
         ))
         db.commit()
-    return {"score": score, "passed": passed, "correct": correct, "total": len(questions), "progress": progress}
+    return {
+        "score": score,
+        "passed": passed,
+        "correct": correct,
+        "total": len(questions),
+        "progress": progress,
+        "passing_score": settings["pass_percentage"],
+    }
 
 @app.get("/leaderboard")
 

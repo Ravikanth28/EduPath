@@ -15,7 +15,6 @@ export default function CoursePage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [savingModule, setSavingModule] = useState<number | null>(null);
   const [expandedModule, setExpandedModule] = useState<string | null>(null);
   const [currentVideo, setCurrentVideo] = useState<{ moduleId: string; index: number } | null>(null);
   const [aiTool, setAiTool] = useState<AITool>(null);
@@ -23,8 +22,9 @@ export default function CoursePage() {
   const [quizAnswers, setQuizAnswers] = useState<(number | null)[]>([]);
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [watchedVideos, setWatchedVideos] = useState<Set<string>>(new Set());
 
-  const refreshModules = async (cId: string, cData: Course) => {
+  const refreshModules = async (cId: string) => {
     const mods = await api.modules.list(cId).catch(() => [] as CourseModule[]);
     setModules(mods);
     const currentMod = mods.find(m => !m.completed && m.unlocked) ?? mods[0];
@@ -41,7 +41,7 @@ export default function CoursePage() {
     api.courses.get(courseId)
       .then(async data => {
         setCourse(data);
-        await refreshModules(courseId, data);
+        await refreshModules(courseId);
       })
       .finally(() => setLoading(false));
   }, [courseId]);
@@ -70,36 +70,39 @@ export default function CoursePage() {
   const progress = course?.progress ?? 0;
   const completedModules = modules.filter(m => m.completed).length;
   const courseComplete = progress >= 100;
+  const videoKey = (moduleNum: number, videoIdx: number) => `${moduleNum}:${videoIdx}`;
+  const isVideoWatched = (mod: CourseModule, videoIdx: number) =>
+    mod.completed || mod.videos[videoIdx]?.watched || watchedVideos.has(videoKey(mod.num, videoIdx));
+  const isModuleTestUnlocked = (mod: CourseModule) =>
+    mod.completed || (mod.unlocked && mod.videos.length > 0 && mod.videos.every((_, idx) => isVideoWatched(mod, idx)));
+  const activeModuleTestUnlocked = activeModule ? isModuleTestUnlocked(activeModule) : false;
+
+  const markVideoWatched = (moduleNum: number, videoIdx: number, listIdx: number) => {
+    setWatchedVideos(current => {
+      const next = new Set(current);
+      next.add(videoKey(moduleNum, listIdx));
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(`watched-videos:${courseId}`, JSON.stringify([...next]));
+      }
+      return next;
+    });
+    setModules(current => current.map(mod => (
+      mod.num === moduleNum
+        ? { ...mod, videos: mod.videos.map((video, idx) => idx === listIdx ? { ...video, watched: true } : video) }
+        : mod
+    )));
+    api.modules.markVideoWatched(courseId, moduleNum, videoIdx).catch(() => {});
+  };
 
   // Called by VideoPlayer when the video finishes
   const handleVideoEnd = async () => {
     if (!activeModule || !currentVideo) return;
+    const completedVideo = activeModule.videos[currentVideo.index];
+    if (!completedVideo) return;
+    markVideoWatched(activeModule.num, completedVideo.idx, currentVideo.index);
     const nextIdx = currentVideo.index + 1;
     if (nextIdx < activeModule.videos.length) {
-      // Advance to next video in this module
       setCurrentVideo({ moduleId: currentVideo.moduleId, index: nextIdx });
-    } else if (!activeModule.completed && activeModule.unlocked) {
-      // All videos watched — auto-complete this module
-      await completeActiveModule();
-    }
-  };
-
-  const completeActiveModule = async () => {
-    if (!activeModule || !course || activeModule.completed || !activeModule.unlocked) return;
-    setSavingModule(activeModule.num);
-    try {
-      const result = await api.courses.completeModule(course.id, activeModule.num);
-      setCourse(prev => prev ? { ...prev, progress: result.progress, completed: result.completed, enrolled: true } : prev);
-      // Refresh modules list from API
-      const mods = await api.modules.list(course.id).catch(() => modules);
-      setModules(mods);
-      const nextMod = mods.find(m => !m.completed && m.unlocked) ?? mods[mods.length - 1];
-      if (nextMod) {
-        setExpandedModule(String(nextMod.num));
-        setCurrentVideo({ moduleId: String(nextMod.num), index: 0 });
-      }
-    } finally {
-      setSavingModule(null);
     }
   };
 
@@ -191,14 +194,15 @@ export default function CoursePage() {
                     <div style={{ marginTop: "4px", marginLeft: "12px", paddingLeft: "12px", borderLeft: "1px solid rgba(17,19,34,0.07)", display: "flex", flexDirection: "column", gap: "3px", paddingBottom: "6px" }}>
                       {mod.videos.map((v, idx) => {
                         const isCurrent = currentVideo?.moduleId === modId && currentVideo?.index === idx;
+                        const watched = isVideoWatched(mod, idx);
                         return (
                           <button
                             key={idx}
                             onClick={() => setCurrentVideo({ moduleId: modId, index: idx })}
                             style={{ display: "flex", alignItems: "center", gap: "9px", padding: "8px 10px", borderRadius: "9px", textAlign: "left", cursor: "pointer", background: isCurrent ? "rgba(47,69,216,0.12)" : "transparent", border: `1px solid ${isCurrent ? "rgba(47,69,216,0.35)" : "transparent"}`, outline: "none", width: "100%", transition: "all .15s" }}
                           >
-                            <div style={{ width: "20px", height: "20px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: v.watched ? "rgba(106,112,133,0.15)" : "rgba(17,19,34,0.06)" }}>
-                              {v.watched
+                            <div style={{ width: "20px", height: "20px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: watched ? "rgba(106,112,133,0.15)" : "rgba(17,19,34,0.06)" }}>
+                              {watched
                                 ? <CheckCircle size={11} style={{ color: "#111322" }} />
                                 : <span style={{ fontSize: "9px", color: "rgba(17,19,34,0.4)", fontWeight: 600 }}>{idx + 1}</span>}
                             </div>
@@ -206,7 +210,7 @@ export default function CoursePage() {
                           </button>
                         );
                       })}
-                      {mod.unlocked ? (
+                      {mod.completed || isModuleTestUnlocked(mod) ? (
                         <Link
                           href={`/dashboard/courses/${course.id}/test/${modId}`}
                           style={{ display: "flex", alignItems: "center", gap: "9px", padding: "8px 10px", borderRadius: "9px", textDecoration: "none", fontSize: "12px", color: mod.completed ? "#111322" : "#2F45D8", background: mod.completed ? "rgba(106,112,133,0.06)" : "rgba(47,69,216,0.07)", border: `1px solid ${mod.completed ? "rgba(106,112,133,0.2)" : "rgba(47,69,216,0.2)"}` }}
@@ -214,6 +218,10 @@ export default function CoursePage() {
                           <FileQuestion size={13} />
                           {mod.completed ? `Test Passed - ${mod.score}%` : "Take Module Test"}
                         </Link>
+                      ) : mod.unlocked ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: "9px", padding: "8px 10px", borderRadius: "9px", fontSize: "12px", color: "rgba(17,19,34,0.42)", background: "rgba(17,19,34,0.03)", border: "1px solid rgba(17,19,34,0.08)" }}>
+                          <Lock size={13} /> Watch all videos to unlock test
+                        </div>
                       ) : (
                         <div style={{ display: "flex", alignItems: "center", gap: "9px", padding: "8px 10px", borderRadius: "9px", fontSize: "12px", color: "rgba(17,19,34,0.35)", background: "rgba(17,19,34,0.03)", border: "1px solid rgba(17,19,34,0.08)" }}>
                           <Lock size={13} /> Complete previous module
@@ -236,7 +244,7 @@ export default function CoursePage() {
               <p style={{ fontSize: "15px" }}>Select a module to start learning</p>
             </div>
           ) : (
-            <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: "10px" }}>
 
               {/* Module title + test CTA */}
               <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
@@ -244,13 +252,20 @@ export default function CoursePage() {
                   <p style={{ fontSize: "11px", color: "rgba(17,19,34,0.35)", textTransform: "uppercase", letterSpacing: "0.07em", margin: "0 0 4px" }}>Now Playing</p>
                   <h2 style={{ color: "#111322", fontWeight: 800, fontSize: "20px", margin: 0 }}>{activeModule?.title}</h2>
                 </div>
-                {activeModule && !activeModule.completed && activeModule.unlocked && (
+                {activeModule && !activeModule.completed && activeModule.unlocked && activeModuleTestUnlocked && (
                   <Link
                     href={`/dashboard/courses/${course.id}/test/${String(activeModule.num)}`}
                     style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "10px 20px", borderRadius: "12px", background: "linear-gradient(135deg,#2F45D8,#2336B8)", color: "#FFFFFF", fontSize: "13px", fontWeight: 700, textDecoration: "none", flexShrink: 0 }}
                   >
                     <FileQuestion size={15} /> Take Module Test
                   </Link>
+                )}
+                {activeModule && !activeModule.completed && activeModule.unlocked && !activeModuleTestUnlocked && (
+                  <div
+                    style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "10px 20px", borderRadius: "12px", background: "rgba(17,19,34,0.06)", border: "1px solid rgba(17,19,34,0.12)", color: "rgba(17,19,34,0.48)", fontSize: "13px", fontWeight: 700, flexShrink: 0 }}
+                  >
+                    <Lock size={15} /> Watch all videos to unlock test
+                  </div>
                 )}
                 {activeModule?.completed && (
                   <Link
@@ -264,8 +279,14 @@ export default function CoursePage() {
 
               {/* Video player */}
               {activeVideo && (
-                <div style={{ borderRadius: "16px", overflow: "hidden" }}>
-                  <VideoPlayer videoId={activeVideo.youtube_id} title={activeVideo.title} onComplete={handleVideoEnd} />
+                <div style={{ borderRadius: "16px", overflow: "hidden", maxWidth: "100%" }}>
+                  <VideoPlayer
+                    videoId={activeVideo.youtube_id}
+                    title={activeVideo.title}
+                    onComplete={handleVideoEnd}
+                    playerHeight={courseComplete ? "clamp(520px, calc(100vh - 270px), 720px)" : "clamp(580px, calc(100vh - 185px), 780px)"}
+                    maxWidth="1120px"
+                  />
                 </div>
               )}
 

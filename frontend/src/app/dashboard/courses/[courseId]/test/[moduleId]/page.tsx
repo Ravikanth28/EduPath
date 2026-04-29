@@ -1,11 +1,10 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Trophy, XCircle, CheckCircle, AlertCircle } from "lucide-react";
-import { api, type QuizQuestion } from "@/lib/api";
+import { api, DEFAULT_MODULE_SETTINGS, type CourseModule, type QuizQuestion } from "@/lib/api";
 
-const PASSING_SCORE = 70;
 const LABELS = ["A", "B", "C", "D"];
 
 export default function TestPage() {
@@ -15,6 +14,10 @@ export default function TestPage() {
 
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [moduleTitle, setModuleTitle] = useState(`Module ${moduleNum}`);
+  const [moduleSettings, setModuleSettings] = useState<Pick<CourseModule, "pass_percentage" | "show_explanations">>({
+    pass_percentage: DEFAULT_MODULE_SETTINGS.pass_percentage,
+    show_explanations: DEFAULT_MODULE_SETTINGS.show_explanations,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState(0);
@@ -24,9 +27,20 @@ export default function TestPage() {
   const [score, setScore] = useState(0);
   const [numCorrect, setNumCorrect] = useState(0);
   const [passed, setPassed] = useState(false);
+  const [resultProgress, setResultProgress] = useState<number | null>(null);
+  const [hasNextModule, setHasNextModule] = useState(false);
+
+  const isModuleWatched = useCallback((mod: CourseModule) => {
+    if (mod.completed) return true;
+    if (mod.videos.length === 0) return false;
+    if (mod.videos.every(video => video.watched)) return true;
+    if (typeof window === "undefined") return false;
+    const raw = window.localStorage.getItem(`watched-videos:${courseId}`);
+    const watched = new Set(raw ? JSON.parse(raw) as string[] : []);
+    return mod.videos.every((video, idx) => watched.has(`${mod.num}:${idx}`) || watched.has(`${mod.num}:${video.idx}`));
+  }, [courseId]);
 
   useEffect(() => {
-    setLoading(true);
     Promise.all([
       api.modules.getQuestions(courseId, moduleNum),
       api.modules.list(courseId).catch(() => []),
@@ -35,11 +49,22 @@ export default function TestPage() {
         setQuestions(qs);
         setAnswers(qs.map(() => null));
         const mod = mods.find(m => m.num === moduleNum);
-        if (mod) setModuleTitle(mod.title);
+        setHasNextModule(mods.some(m => m.num > moduleNum));
+        if (mod) {
+          if (!isModuleWatched(mod)) {
+            setError("Watch all videos in this module before taking the test.");
+            return;
+          }
+          setModuleTitle(mod.title);
+          setModuleSettings({
+            pass_percentage: mod.pass_percentage ?? DEFAULT_MODULE_SETTINGS.pass_percentage,
+            show_explanations: mod.show_explanations ?? DEFAULT_MODULE_SETTINGS.show_explanations,
+          });
+        }
       })
       .catch(e => setError((e as Error).message ?? "Failed to load questions"))
       .finally(() => setLoading(false));
-  }, [courseId, moduleNum]);
+  }, [courseId, moduleNum, isModuleWatched]);
 
   const answered = answers.filter(a => a !== null).length;
 
@@ -47,17 +72,20 @@ export default function TestPage() {
     if (answered < questions.length) return;
     setSubmitting(true);
     try {
-      const result = await api.modules.submitTest(courseId, moduleNum, answers as number[]);
+      const result = await api.modules.submitTest(courseId, moduleNum, answers as number[], questions.map(q => q.idx));
       setScore(result.score);
       setNumCorrect(result.correct);
       setPassed(result.passed);
+      setResultProgress(result.progress);
+      setModuleSettings(current => ({ ...current, pass_percentage: result.passing_score }));
       setSubmitted(true);
     } catch {
       const correct = answers.filter((a, i) => a === questions[i].correct).length;
       const s = Math.round((correct / questions.length) * 100);
       setScore(s);
       setNumCorrect(correct);
-      setPassed(s >= PASSING_SCORE);
+      setPassed(s >= moduleSettings.pass_percentage);
+      setResultProgress(null);
       setSubmitted(true);
     } finally {
       setSubmitting(false);
@@ -100,6 +128,7 @@ export default function TestPage() {
   }
 
   if (submitted) {
+    const courseCompleted = passed && (resultProgress ?? 0) >= 100;
     return (
       <div style={PAGE_BG}>
       <div style={{ maxWidth: "720px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -110,19 +139,24 @@ export default function TestPage() {
           {passed ? <Trophy size={52} style={{ color: "#111322" }} /> : <XCircle size={52} style={{ color: "#2F45D8" }} />}
           <p style={{ fontSize: "64px", fontWeight: 900, margin: 0, background: "linear-gradient(135deg,#2F45D8,#2336B8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{score}%</p>
           <p style={{ fontSize: "22px", fontWeight: 700, color: passed ? "#111322" : "#2F45D8", margin: 0 }}>{passed ? "Passed!" : "Not Passed"}</p>
-          <p style={{ fontSize: "14px", color: "rgba(17,19,34,0.45)", margin: 0 }}>{numCorrect} / {questions.length} correct &middot; Passing: {PASSING_SCORE}%</p>
+          <p style={{ fontSize: "14px", color: "rgba(17,19,34,0.45)", margin: 0 }}>{numCorrect} / {questions.length} correct &middot; Passing: {moduleSettings.pass_percentage}%</p>
           {passed && (
             <span style={{ padding: "4px 14px", borderRadius: "20px", background: "rgba(106,112,133,0.12)", border: "1px solid rgba(106,112,133,0.3)", color: "#111322", fontSize: "13px", fontWeight: 700 }}>
-              Module Unlocked!
+              {courseCompleted ? "Course Complete!" : "Next module unlocked!"}
             </span>
           )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "center", marginTop: "8px" }}>
             <Link href={`/dashboard/courses/${courseId}`} style={{ display: "inline-flex", alignItems: "center", padding: "10px 24px", borderRadius: "12px", background: "rgba(17,19,34,0.06)", border: "1px solid rgba(17,19,34,0.12)", color: "#111322", fontSize: "14px", fontWeight: 600, textDecoration: "none" }}>
               Back to Course
             </Link>
-            {passed && (
+            {passed && courseCompleted && (
               <Link href="/dashboard/certificates" style={{ display: "inline-flex", alignItems: "center", padding: "10px 24px", borderRadius: "12px", background: "linear-gradient(135deg,#2F45D8,#2336B8)", color: "#FFFFFF", fontSize: "14px", fontWeight: 700, textDecoration: "none" }}>
                 View Certificates
+              </Link>
+            )}
+            {passed && !courseCompleted && (
+              <Link href={`/dashboard/courses/${courseId}`} style={{ display: "inline-flex", alignItems: "center", padding: "10px 24px", borderRadius: "12px", background: "linear-gradient(135deg,#2F45D8,#2336B8)", color: "#FFFFFF", fontSize: "14px", fontWeight: 700, textDecoration: "none" }}>
+                {hasNextModule ? "Next Module" : "Back to Course"}
               </Link>
             )}
             {!passed && (
@@ -146,7 +180,9 @@ export default function TestPage() {
                   {!isCorrect && answers[i] !== null && (
                     <p style={{ color: "#2F45D8", fontSize: "13px", margin: "0 0 4px" }}>Your answer: {q.opts[answers[i]!]}</p>
                   )}
-                  <p style={{ color: "rgba(17,19,34,0.40)", fontSize: "12px", margin: "6px 0 0", lineHeight: "1.5" }}>{q.exp}</p>
+                  {moduleSettings.show_explanations && q.exp && (
+                    <p style={{ color: "rgba(17,19,34,0.40)", fontSize: "12px", margin: "6px 0 0", lineHeight: "1.5" }}>{q.exp}</p>
+                  )}
                 </div>
               </div>
             );

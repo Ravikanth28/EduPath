@@ -27,9 +27,17 @@ interface VideoPlayerProps {
   videoId: string;
   title: string;
   onComplete?: () => void;
+  playerHeight?: string;
+  maxWidth?: string;
 }
 
-export function VideoPlayer({ videoId, title, onComplete }: VideoPlayerProps) {
+export function VideoPlayer({
+  videoId,
+  title,
+  onComplete,
+  playerHeight = "clamp(560px, calc(100vh - 185px), 760px)",
+  maxWidth = "1180px",
+}: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef    = useRef<any>(null);
   const cbRef        = useRef(onComplete);
@@ -77,9 +85,8 @@ export function VideoPlayer({ videoId, title, onComplete }: VideoPlayerProps) {
   }, [videoId]);
 
   return (
-    <div style={{ background: "#000", borderRadius: "16px", overflow: "hidden", border: "1px solid rgba(17,19,34,0.08)" }}>
-      {/* 16:9 wrapper */}
-      <div style={{ position: "relative", width: "100%", paddingBottom: "56.25%" }}>
+    <div style={{ width: "100%", maxWidth, margin: "0 auto", background: "#000", borderRadius: "16px", overflow: "hidden", border: "1px solid rgba(17,19,34,0.08)" }}>
+      <div style={{ position: "relative", width: "100%", height: playerHeight, minHeight: "500px", maxHeight: "calc(100vh - 165px)" }}>
         <div ref={containerRef} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }} />
       </div>
       {/* Info bar */}

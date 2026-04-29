@@ -61,6 +61,11 @@ engine = create_engine(DATABASE_URL, connect_args=_SSL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+DEFAULT_PASS_PERCENTAGE = 70
+DEFAULT_QUESTIONS_PER_TEST = 0
+DEFAULT_SHUFFLE_QUESTIONS = False
+DEFAULT_SHOW_EXPLANATIONS = True
+
 
 # ── ORM Models ────────────────────────────────────────────────────────────────
 class User(Base):
@@ -135,10 +140,14 @@ class CourseModule(Base):
     __tablename__ = "course_modules"
     __table_args__ = (UniqueConstraint("course_id", "num", name="uq_module"),)
 
-    id        = Column(Integer, primary_key=True, autoincrement=True)
-    course_id = Column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
-    num       = Column(Integer, nullable=False)
-    title     = Column(String(200), nullable=False)
+    id                 = Column(Integer, primary_key=True, autoincrement=True)
+    course_id          = Column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    num                = Column(Integer, nullable=False)
+    title              = Column(String(200), nullable=False)
+    pass_percentage    = Column(Integer, nullable=False, default=DEFAULT_PASS_PERCENTAGE)
+    questions_per_test = Column(Integer, nullable=False, default=DEFAULT_QUESTIONS_PER_TEST)
+    shuffle_questions  = Column(Boolean, nullable=False, default=DEFAULT_SHUFFLE_QUESTIONS)
+    show_explanations  = Column(Boolean, nullable=False, default=DEFAULT_SHOW_EXPLANATIONS)
 
 
 class ModuleVideo(Base):
@@ -151,6 +160,20 @@ class ModuleVideo(Base):
     idx        = Column(Integer, nullable=False)
     youtube_id = Column(String(20), nullable=False)
     title      = Column(String(200), nullable=False)
+
+
+class ModuleVideoProgress(Base):
+    __tablename__ = "module_video_progress"
+    __table_args__ = (
+        UniqueConstraint("user_id", "course_id", "module_num", "video_idx", name="uq_video_progress"),
+    )
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    user_id    = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    course_id  = Column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    module_num = Column(Integer, nullable=False)
+    video_idx  = Column(Integer, nullable=False)
+    watched_at = Column(DateTime, default=datetime.utcnow)
 
 
 class ModuleQuestion(Base):
@@ -172,8 +195,32 @@ class ModuleQuestion(Base):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def init_db() -> None:
-    """Create all tables (idempotent — safe to call on every startup)."""
     Base.metadata.create_all(bind=engine)
+    _ensure_course_module_settings_columns()
+
+
+def _ensure_course_module_settings_columns() -> None:
+    columns = {
+        "pass_percentage": f"INT NOT NULL DEFAULT {DEFAULT_PASS_PERCENTAGE}",
+        "questions_per_test": f"INT NOT NULL DEFAULT {DEFAULT_QUESTIONS_PER_TEST}",
+        "shuffle_questions": f"BOOLEAN NOT NULL DEFAULT {str(DEFAULT_SHUFFLE_QUESTIONS).upper()}",
+        "show_explanations": f"BOOLEAN NOT NULL DEFAULT {str(DEFAULT_SHOW_EXPLANATIONS).upper()}",
+    }
+    with engine.begin() as conn:
+        existing = {
+            row[0]
+            for row in conn.execute(text(
+                """
+                SELECT COLUMN_NAME
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'course_modules'
+                """
+            ))
+        }
+        for name, definition in columns.items():
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE course_modules ADD COLUMN {name} {definition}"))
 
 
 def get_db():
