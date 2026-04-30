@@ -13,7 +13,13 @@ const NAV_LINKS = [
   { href: "/dashboard/profile",        label: "My Profile",   icon: User },
 ];
 
-function SidebarContent({ pathname, onNavClick, onLogout, userName, userEmail }: { pathname: string; onNavClick: () => void; onLogout: () => void; userName: string; userEmail: string }) {
+function getNavLinks(showDashboard: boolean) {
+  return showDashboard ? NAV_LINKS : NAV_LINKS.filter(link => link.href !== "/dashboard");
+}
+
+function SidebarContent({ pathname, onNavClick, onLogout, userName, userEmail, showDashboard }: { pathname: string; onNavClick: () => void; onLogout: () => void; userName: string; userEmail: string; showDashboard: boolean }) {
+  const navLinks = getNavLinks(showDashboard);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#0A0A12", borderRight: "1px solid rgba(255,255,255,0.06)" }}>
       {/* Brand */}
@@ -29,7 +35,7 @@ function SidebarContent({ pathname, onNavClick, onLogout, userName, userEmail }:
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: "12px 10px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "2px" }}>
-        {NAV_LINKS.map(({ href, label, icon: Icon }) => {
+        {navLinks.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
           return (
             <Link key={href} href={href} onClick={onNavClick} style={{
@@ -69,6 +75,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userName, setUserName]     = useState("");
   const [userEmail, setUserEmail]   = useState("");
+  const [dashboardEnabled, setDashboardEnabled] = useState(true);
   const [ready, setReady]           = useState(false);
   const pathname = usePathname();
   const router   = useRouter();
@@ -76,14 +83,30 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (!getToken()) { router.replace("/login"); return; }
     api.profile.get()
-      .then(u => {
+      .then(async u => {
         if (u.role === "admin") { router.replace("/admin"); return; }
+
+        let enabled = true;
+        try {
+          const settings = await api.platform.settings();
+          enabled = Boolean(settings.student_dashboard_enabled);
+        } catch {
+          enabled = true;
+        }
+
         setUserName(u.name);
         setUserEmail(u.email);
+        setDashboardEnabled(enabled);
         setReady(true);
       })
       .catch(() => { clearToken(); router.replace("/login"); });
   }, [router]);
+
+  useEffect(() => {
+    if (ready && !dashboardEnabled && pathname === "/dashboard") {
+      router.replace("/dashboard/courses");
+    }
+  }, [dashboardEnabled, pathname, ready, router]);
 
   const handleSignOut = () => { clearToken(); router.replace("/login"); };
 
@@ -101,14 +124,14 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         className="desktop-sidebar-wrap"
         style={{ width: pathname.startsWith("/dashboard/courses/") ? "0" : "240px" }}
       >
-        <SidebarContent pathname={pathname} onNavClick={() => {}} onLogout={handleSignOut} userName={userName} userEmail={userEmail} />
+        <SidebarContent pathname={pathname} onNavClick={() => {}} onLogout={handleSignOut} userName={userName} userEmail={userEmail} showDashboard={dashboardEnabled} />
       </div>
 
       {/* Mobile overlay */}
       {mobileOpen && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex" }}>
           <div style={{ width: "240px", flexShrink: 0, display: "flex", flexDirection: "column" }}>
-            <SidebarContent pathname={pathname} onNavClick={() => setMobileOpen(false)} onLogout={handleSignOut} userName={userName} userEmail={userEmail} />
+            <SidebarContent pathname={pathname} onNavClick={() => setMobileOpen(false)} onLogout={handleSignOut} userName={userName} userEmail={userEmail} showDashboard={dashboardEnabled} />
           </div>
           <div style={{ flex: 1, background: "rgba(17,19,34,0.65)" }} onClick={() => setMobileOpen(false)} />
         </div>

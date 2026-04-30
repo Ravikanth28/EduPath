@@ -8,13 +8,13 @@ import { api } from "@/lib/api";
 
 const CATEGORIES = ["Mathematics", "Physics", "Chemistry", "Computer Science", "Electronics", "Mechanics", "Engineering Drawing", "English", "AI & Data Science", "Other"];
 
-const BG = "#06060F";
-const CARD = "rgba(16,14,36,0.95)";
-const BORDER = "rgba(124,58,237,0.25)";
-const INPUT_BG = "rgba(255,255,255,0.04)";
-const INPUT_BORDER = "rgba(255,255,255,0.1)";
-const LABEL: React.CSSProperties = { color: "rgba(255,255,255,0.75)", fontSize: "14px", fontWeight: 600, marginBottom: "8px", display: "block" };
-const INPUT: React.CSSProperties = { width: "100%", background: INPUT_BG, border: `1px solid ${INPUT_BORDER}`, borderRadius: "10px", color: "#fff", padding: "12px 16px", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
+const BG = "transparent";
+const CARD = "linear-gradient(180deg, rgba(238,243,255,0.98), rgba(225,232,255,0.94))";
+const BORDER = "rgba(17,19,34,0.1)";
+const INPUT_BG = "rgba(17,19,34,0.04)";
+const INPUT_BORDER = "rgba(17,19,34,0.12)";
+const LABEL: React.CSSProperties = { color: "rgba(17,19,34,0.7)", fontSize: "14px", fontWeight: 600, marginBottom: "8px", display: "block" };
+const INPUT: React.CSSProperties = { width: "100%", background: INPUT_BG, border: `1px solid ${INPUT_BORDER}`, borderRadius: "10px", color: "#111322", padding: "12px 16px", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
 
 export default function NewCoursePage() {
   const [form, setForm] = useState({ title: "", desc: "", category: "", videos: 0, quizzes: 0 });
@@ -74,17 +74,17 @@ export default function NewCoursePage() {
 
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "32px" }}>
-          <Link href="/admin/courses" style={{ width: "38px", height: "38px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.5)", textDecoration: "none", flexShrink: 0, transition: "all .15s" }}
+          <Link href="/admin/courses" style={{ width: "38px", height: "38px", borderRadius: "10px", border: "1px solid rgba(17,19,34,0.12)", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(17,19,34,0.55)", textDecoration: "none", flexShrink: 0, transition: "all .15s" }}
             onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(124,58,237,0.5)"; (e.currentTarget as HTMLAnchorElement).style.color = "#fff"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(255,255,255,0.1)"; (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.5)"; }}>
+            onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(17,19,34,0.12)"; (e.currentTarget as HTMLAnchorElement).style.color = "rgba(17,19,34,0.55)"; }}>
             <ArrowLeft size={16} />
           </Link>
           <div>
             <h1 style={{ margin: 0, fontSize: "26px", fontWeight: 800, lineHeight: 1.2 }}>
-              <span style={{ color: "#fff" }}>Create </span>
+              <span style={{ color: "#111322" }}>Create </span>
               <span style={{ background: "linear-gradient(90deg,#A78BFA,#60A5FA)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>New Course</span>
             </h1>
-            <p style={{ margin: "4px 0 0", color: "rgba(255,255,255,0.35)", fontSize: "13px" }}>Modules will be generated automatically</p>
+            <p style={{ margin: "4px 0 0", color: "rgba(17,19,34,0.45)", fontSize: "13px" }}>Modules will be generated automatically</p>
           </div>
         </div>
 
@@ -126,8 +126,8 @@ export default function NewCoursePage() {
                 style={{ ...INPUT, appearance: "none", cursor: "pointer" }}
                 onFocus={focusStyle} onBlur={blurStyle}
               >
-                <option value="" style={{ background: "#111" }}>Select category...</option>
-                {CATEGORIES.map(c => <option key={c} value={c} style={{ background: "#111" }}>{c}</option>)}
+                <option value="" style={{ background: "#fff" }}>Select category...</option>
+                {CATEGORIES.map(c => <option key={c} value={c} style={{ background: "#fff" }}>{c}</option>)}
               </select>
             </div>
 
@@ -164,14 +164,14 @@ export default function NewCoursePage() {
               <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
                 {([["youtube", PlayCircle, "YouTube URL"], ["upload", Upload, "Upload Image"]] as const).map(([key, Icon, label]) => (
                   <button key={key} type="button" onClick={() => setThumbTab(key as "youtube" | "upload")}
-                    style={{ display: "flex", alignItems: "center", gap: "7px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer", border: "none", background: thumbTab === key ? "rgba(124,58,237,0.35)" : "rgba(255,255,255,0.05)", color: thumbTab === key ? "#C4B5FD" : "rgba(255,255,255,0.4)", transition: "all .15s" }}>
+                    style={{ display: "flex", alignItems: "center", gap: "7px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer", border: "1px solid rgba(17,19,34,0.1)", background: thumbTab === key ? "rgba(47,69,216,0.18)" : "rgba(17,19,34,0.05)", color: thumbTab === key ? "#2F45D8" : "rgba(17,19,34,0.55)", transition: "all .15s" }}>
                     <Icon size={14} /> {label}
                   </button>
                 ))}
               </div>
               {thumbTab === "youtube" ? (
                 <div style={{ position: "relative" }}>
-                  <div style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.25)", pointerEvents: "none" }}>
+                  <div style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "rgba(17,19,34,0.3)", pointerEvents: "none" }}>
                     <PlayCircle size={16} />
                   </div>
                   <input
@@ -183,38 +183,38 @@ export default function NewCoursePage() {
                   />
                 </div>
               ) : (
-                <label style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", background: INPUT_BG, border: `1.5px dashed rgba(255,255,255,0.15)`, borderRadius: "10px", cursor: "pointer", transition: "border-color .15s" }}
+                <label style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", background: INPUT_BG, border: `1.5px dashed rgba(17,19,34,0.2)`, borderRadius: "10px", cursor: "pointer", transition: "border-color .15s" }}
                   onMouseEnter={e => (e.currentTarget as HTMLLabelElement).style.borderColor = "rgba(124,58,237,0.5)"}
-                  onMouseLeave={e => (e.currentTarget as HTMLLabelElement).style.borderColor = "rgba(255,255,255,0.15)"}>
-                  <Upload size={18} style={{ color: "rgba(255,255,255,0.3)" }} />
-                  <span style={{ color: "rgba(255,255,255,0.35)", fontSize: "14px" }}>Click to choose an image file</span>
+                  onMouseLeave={e => (e.currentTarget as HTMLLabelElement).style.borderColor = "rgba(17,19,34,0.2)"}>
+                  <Upload size={18} style={{ color: "rgba(17,19,34,0.35)" }} />
+                  <span style={{ color: "rgba(17,19,34,0.45)", fontSize: "14px" }}>Click to choose an image file</span>
                   <input type="file" accept="image/*" style={{ display: "none" }} />
                 </label>
               )}
-              {thumbTab === "youtube" && <p style={{ color: "rgba(255,255,255,0.25)", fontSize: "12px", marginTop: "6px" }}>Paste any YouTube video URL — its thumbnail image will be used as the course cover.</p>}
+              {thumbTab === "youtube" && <p style={{ color: "rgba(17,19,34,0.35)", fontSize: "12px", marginTop: "6px" }}>Paste any YouTube video URL; its thumbnail image will be used as the course cover.</p>}
             </div>
 
             {/* Divider */}
-            <div style={{ height: "1px", background: "rgba(255,255,255,0.07)" }} />
+            <div style={{ height: "1px", background: "rgba(17,19,34,0.1)" }} />
 
             {/* Module count */}
             <div>
               <label style={LABEL}>How many modules? *</label>
               <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
                 <button type="button" onClick={() => handleModuleCount(-1)} disabled={moduleCount <= 1}
-                  style={{ width: "40px", height: "40px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: moduleCount <= 1 ? 0.3 : 1, flexShrink: 0 }}>
+                  style={{ width: "40px", height: "40px", borderRadius: "50%", border: "1px solid rgba(17,19,34,0.15)", background: "rgba(17,19,34,0.05)", color: "rgba(17,19,34,0.6)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: moduleCount <= 1 ? 0.3 : 1, flexShrink: 0 }}>
                   <Minus size={16} />
                 </button>
                 <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
                   <span style={{ fontSize: "42px", fontWeight: 900, color: "#A78BFA", lineHeight: 1 }}>{moduleCount}</span>
-                  <span style={{ color: "rgba(255,255,255,0.35)", fontSize: "14px" }}>modules</span>
+                  <span style={{ color: "rgba(17,19,34,0.45)", fontSize: "14px" }}>modules</span>
                 </div>
                 <button type="button" onClick={() => handleModuleCount(1)} disabled={moduleCount >= 20}
-                  style={{ width: "40px", height: "40px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: moduleCount >= 20 ? 0.3 : 1, flexShrink: 0 }}>
+                  style={{ width: "40px", height: "40px", borderRadius: "50%", border: "1px solid rgba(17,19,34,0.15)", background: "rgba(17,19,34,0.05)", color: "rgba(17,19,34,0.6)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: moduleCount >= 20 ? 0.3 : 1, flexShrink: 0 }}>
                   <Plus size={16} />
                 </button>
               </div>
-              <p style={{ color: "rgba(255,255,255,0.25)", fontSize: "12px", marginTop: "8px" }}>{moduleCount} module{moduleCount !== 1 ? "s" : ""} will be created. You can add videos &amp; questions to each module after.</p>
+              <p style={{ color: "rgba(17,19,34,0.35)", fontSize: "12px", marginTop: "8px" }}>{moduleCount} module{moduleCount !== 1 ? "s" : ""} will be created. You can add videos and questions to each module after.</p>
             </div>
 
             {/* Module Names */}

@@ -14,13 +14,13 @@ export default function AdminLeaderboardPage() {
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold text-white">Leaderboard</h1>
-        <p className="text-white/50 text-sm mt-0.5">Platform-wide student rankings</p>
+        <h1 className="text-2xl font-bold text-slate-900">Leaderboard</h1>
+        <p className="text-slate-600 text-sm mt-0.5">Platform-wide student rankings</p>
       </div>
 
       {/* Points system */}
       <div className="glass-card p-5">
-        <h3 className="font-semibold text-white mb-4">Points System</h3>
+        <h3 className="font-semibold text-slate-900 mb-4">Points System</h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {POINTS_GUIDE.map(({ icon: Icon, label, desc, points, color, bg }) => (
             <div key={label} className="text-center p-3 rounded-xl" style={{ background: "rgba(17,19,34,0.02)" }}>
@@ -28,8 +28,8 @@ export default function AdminLeaderboardPage() {
                 <Icon size={18} className={color} />
               </div>
               <p className={`text-xl font-black ${color}`}>{points}</p>
-              <p className="text-sm font-semibold text-white mt-0.5">{label}</p>
-              <p className="text-xs text-white/40">{desc}</p>
+              <p className="text-sm font-semibold text-slate-800 mt-0.5">{label}</p>
+              <p className="text-xs text-slate-600">{desc}</p>
             </div>
           ))}
         </div>

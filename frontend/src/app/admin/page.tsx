@@ -35,6 +35,9 @@ export default function AdminDashboard() {
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [leaders, setLeaders]   = useState<LeaderboardEntry[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [studentDashboardEnabled, setStudentDashboardEnabled] = useState(true);
+  const [savingDashboardSetting, setSavingDashboardSetting] = useState(false);
+  const [dashboardSettingError, setDashboardSettingError] = useState("");
 
   useEffect(() => {
     api.admin.stats().then(setStats).catch(() => {});
@@ -43,7 +46,22 @@ export default function AdminDashboard() {
     api.students.list().then(s =>
       setStudents([...s].sort((a, b) => new Date(b.joined).getTime() - new Date(a.joined).getTime()).slice(0, 4))
     ).catch(() => {});
+    api.admin.platformSettings().then(s => setStudentDashboardEnabled(Boolean(s.student_dashboard_enabled))).catch(() => {});
   }, []);
+
+  const handleStudentDashboardToggle = async () => {
+    setSavingDashboardSetting(true);
+    setDashboardSettingError("");
+    try {
+      const nextEnabled = !studentDashboardEnabled;
+      const result = await api.admin.setStudentDashboardVisibility(nextEnabled);
+      setStudentDashboardEnabled(Boolean(result.student_dashboard_enabled));
+    } catch {
+      setDashboardSettingError("Could not update setting. Please try again.");
+    } finally {
+      setSavingDashboardSetting(false);
+    }
+  };
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -106,6 +124,39 @@ export default function AdminDashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* -- Platform controls -- */}
+      <div style={{ ...card, padding: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+        <div>
+          <p style={{ fontSize: "15px", fontWeight: 700, color: "#111322", margin: "0 0 4px" }}>Student Dashboard Visibility</p>
+          <p style={{ fontSize: "12px", color: "rgba(17,19,34,0.5)", margin: 0 }}>
+            {studentDashboardEnabled
+              ? "Students can see the Dashboard menu and dashboard page."
+              : "Dashboard menu and dashboard page are hidden from students."}
+          </p>
+          {dashboardSettingError ? (
+            <p style={{ fontSize: "12px", color: "#B42318", margin: "8px 0 0" }}>{dashboardSettingError}</p>
+          ) : null}
+        </div>
+        <button
+          onClick={handleStudentDashboardToggle}
+          disabled={savingDashboardSetting}
+          style={{
+            border: "1px solid rgba(47,69,216,0.35)",
+            background: studentDashboardEnabled ? "#2F45D8" : "#FFFFFF",
+            color: studentDashboardEnabled ? "#FFFFFF" : "#2F45D8",
+            borderRadius: "10px",
+            padding: "10px 14px",
+            fontSize: "12px",
+            fontWeight: 700,
+            cursor: savingDashboardSetting ? "not-allowed" : "pointer",
+            opacity: savingDashboardSetting ? 0.7 : 1,
+            minWidth: "140px",
+          }}
+        >
+          {savingDashboardSetting ? "Saving..." : studentDashboardEnabled ? "Disable Dashboard" : "Enable Dashboard"}
+        </button>
       </div>
 
       {/* -- Quick actions -- */}

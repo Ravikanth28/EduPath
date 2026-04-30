@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { api, DEFAULT_MODULE_SETTINGS, type AdminModule, type AdminVideo, type AdminQuestion, type Course } from "@/lib/api";
 
 // ── Style constants ──────────────────────────────────────────────────────────
-const BG      = "#06060F";
+const BG      = "transparent";
 const CARD    = "rgba(16,14,36,0.95)";
 const BORDER  = "rgba(255,255,255,0.07)";
 const PBORDER = "rgba(124,58,237,0.3)";
@@ -506,7 +506,6 @@ export default function CourseManagePage() {
             <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "13px", margin: "3px 0 0" }}>{modules.length} modules</p>
           </div>
         </div>
-
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           {modules.map(mod => {
             const isOpen = expandedNum === mod.num;
