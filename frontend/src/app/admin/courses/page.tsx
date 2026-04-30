@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Search, Plus, Trash2, BookOpen, Video, Users, Settings, CheckSquare, CheckCircle, EyeOff, Eye } from "lucide-react";
+import { Search, Plus, Trash2, BookOpen, Video, Users, Settings, CheckSquare, CheckCircle, EyeOff, Eye, UserPlus, BarChart3 } from "lucide-react";
 import toast from "react-hot-toast";
 import { api, type Course } from "@/lib/api";
 
@@ -191,25 +191,42 @@ export default function AdminCoursesPage() {
                   </div>
 
                   {/* Action buttons */}
-                  <div style={{ marginTop: "auto", display: "flex", gap: "8px" }}>
-                    <button
-                      onClick={() => togglePublish(c.id)}
-                      style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 14px", height: "42px", borderRadius: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer", background: "rgba(17,19,34,0.04)", border: "1px solid rgba(17,19,34,0.1)", color: "rgba(17,19,34,0.6)", flexShrink: 0, transition: "all .15s" }}
-                    >
-                      {isPublished ? <><EyeOff size={14} /> Unpublish</> : <><Eye size={14} /> Publish</>}
-                    </button>
-                    <Link
-                      href={`/admin/courses/${c.id}`}
-                      style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", height: "42px", borderRadius: "12px", fontSize: "13px", fontWeight: 700, textDecoration: "none", color: "#111322", background: c.grad, transition: "opacity .2s" }}
-                    >
-                      <Settings size={14} /> Manage
-                    </Link>
-                    <button
-                      onClick={() => setShowDeleteModal(c.id)}
-                      style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "12px", border: "1px solid rgba(47,69,216,0.2)", background: "transparent", color: "#2F45D8", cursor: "pointer", flexShrink: 0, transition: "background .15s" }}
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                  <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" }}>
+                      <button
+                        onClick={() => togglePublish(c.id)}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "0 8px", height: "42px", borderRadius: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer", background: "rgba(17,19,34,0.04)", border: "1px solid rgba(17,19,34,0.1)", color: "rgba(17,19,34,0.6)", minWidth: 0, whiteSpace: "nowrap", transition: "all .15s" }}
+                      >
+                        {isPublished ? <><EyeOff size={14} /> Unpublish</> : <><Eye size={14} /> Publish</>}
+                      </button>
+                      <Link
+                        href={`/admin/courses/${c.id}/assign`}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "0 8px", height: "42px", borderRadius: "12px", fontSize: "13px", fontWeight: 700, textDecoration: "none", color: "#2F45D8", background: "rgba(47,69,216,0.08)", border: "1px solid rgba(47,69,216,0.2)", minWidth: 0, whiteSpace: "nowrap" }}
+                      >
+                        <UserPlus size={14} /> Assign
+                      </Link>
+                      <Link
+                        href={`/admin/courses/${c.id}/status`}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "0 8px", height: "42px", borderRadius: "12px", fontSize: "13px", fontWeight: 700, textDecoration: "none", color: "#2F45D8", background: "rgba(47,69,216,0.08)", border: "1px solid rgba(47,69,216,0.2)", minWidth: 0, whiteSpace: "nowrap" }}
+                      >
+                        <BarChart3 size={14} /> Status
+                      </Link>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <Link
+                        href={`/admin/courses/${c.id}`}
+                        style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", height: "42px", borderRadius: "12px", fontSize: "13px", fontWeight: 700, textDecoration: "none", color: "#111322", background: c.grad, transition: "opacity .2s" }}
+                      >
+                        <Settings size={14} /> Manage
+                      </Link>
+                      <button
+                        onClick={() => setShowDeleteModal(c.id)}
+                        style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "12px", border: "1px solid rgba(47,69,216,0.2)", background: "transparent", color: "#2F45D8", cursor: "pointer", flexShrink: 0, transition: "background .15s" }}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
 
                 </div>

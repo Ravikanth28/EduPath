@@ -1,10 +1,11 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Shield, CheckCircle, Clock, XCircle, FileText, Search, Download,
-  Copy, X, Filter, ChevronUp, ChevronDown, RefreshCw, ArrowUpDown,
+  Copy, X, Filter, ChevronUp, ChevronDown, RefreshCw, ArrowUpDown, Loader2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { api } from "@/lib/api";
 
 const COURSES_LIST = [
   "Engineering Mathematics",
@@ -51,6 +52,28 @@ export default function AdminCertificatesPage() {
   const [bulkRevokeModal, setBulkRevokeModal] = useState(false);
   const [bulkApproveModal, setBulkApproveModal] = useState(false);
   const [revokeReason, setRevokeReason]   = useState("");
+  const [issuing, setIssuing]             = useState(false);
+
+  const loadCertificates = async () => {
+    const data = await api.certificates.list();
+    const mapped: Cert[] = data.map(c => ({
+      id: c.id,
+      student: c.student ?? "Unknown Student",
+      phone: c.phone ?? "-",
+      course: c.course,
+      category: c.category,
+      issued: c.issued,
+      status: c.status,
+      revokeReason: undefined,
+    }));
+    setCerts(mapped);
+  };
+
+  useEffect(() => {
+    loadCertificates().catch(() => {
+      toast.error("Failed to load certificates");
+    });
+  }, []);
 
   // -- Status helpers ---------------------------------------------------------
   const getStatus = (id: string) => certs.find(c => c.id === id)?.status ?? "pending";
@@ -60,8 +83,8 @@ export default function AdminCertificatesPage() {
   const filtered = useMemo(() => {
     return certs
       .filter(c => {
-        if (search && !c.student.toLowerCase().includes(search.toLowerCase()) &&
-            !c.phone.includes(search) && !c.id.toLowerCase().includes(search.toLowerCase()) &&
+        if (search && !(c.student ?? "").toLowerCase().includes(search.toLowerCase()) &&
+            !(c.phone ?? "").includes(search) && !c.id.toLowerCase().includes(search.toLowerCase()) &&
             !c.course.toLowerCase().includes(search.toLowerCase())) return false;
         if (fStudent !== "All Students" && c.student !== fStudent) return false;
         if (fCourse !== "All Courses"   && c.course   !== fCourse)  return false;
@@ -73,7 +96,7 @@ export default function AdminCertificatesPage() {
       })
       .sort((a, b) => {
         let val = 0;
-        if (sortField === "student") val = a.student.localeCompare(b.student);
+        if (sortField === "student") val = (a.student ?? "").localeCompare(b.student ?? "");
         else if (sortField === "course") val = a.course.localeCompare(b.course);
         else val = new Date(a.issued).getTime() - new Date(b.issued).getTime();
         return sortDir === "asc" ? val : -val;
@@ -86,7 +109,7 @@ export default function AdminCertificatesPage() {
     verified: certs.filter(c => c.status === "verified").length,
     pending:  certs.filter(c => c.status === "pending").length,
     revoked:  certs.filter(c => c.status === "revoked").length,
-    students: new Set(certs.map(c => c.student)).size,
+    students: new Set(certs.map(c => c.student ?? "Unknown Student")).size,
     verifiedPct: certs.length ? Math.round(certs.filter(c => c.status === "verified").length / certs.length * 100) : 0,
   }), [certs]);
 
@@ -141,7 +164,7 @@ export default function AdminCertificatesPage() {
   const handleExportCSV = () => {
     const rows = [
       ["Cert #", "Student", "Phone", "Course", "Category", "Issued", "Status", "Revoke Reason"],
-      ...certs.map(c => [c.id, c.student, c.phone, c.course, c.category, c.issued, c.status, c.revokeReason ?? ""]),
+      ...certs.map(c => [c.id, c.student ?? "Unknown Student", c.phone ?? "-", c.course, c.category, c.issued, c.status, c.revokeReason ?? ""]),
     ];
     const csv = rows.map(r => r.map(v => `"${v}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -149,6 +172,23 @@ export default function AdminCertificatesPage() {
     const a    = document.createElement("a"); a.href = url; a.download = "certificates.csv"; a.click();
     URL.revokeObjectURL(url);
     toast.success("CSV exported!");
+  };
+
+  const handleIssueMissingCertificates = async () => {
+    setIssuing(true);
+    try {
+      const res = await api.admin.issueMissingCertificates();
+      await loadCertificates();
+      if (res.issued_count > 0) {
+        toast.success(`Issued ${res.issued_count} missing certificate(s).`);
+      } else {
+        toast.success("No missing certificates found for completed courses.");
+      }
+    } catch {
+      toast.error("Failed to issue missing certificates");
+    } finally {
+      setIssuing(false);
+    }
   };
 
   const cycleSortField = () => {
@@ -200,7 +240,7 @@ export default function AdminCertificatesPage() {
 
   // -------------------------------------------------------------------------
   return (
-    <div style={{ padding: "28px 24px", display: "flex", flexDirection: "column", gap: "24px" }}>
+    <div style={{ padding: "28px 24px", display: "flex", flexDirection: "column", gap: "24px", background: "linear-gradient(180deg,#0B1020,#0F172A)", borderRadius: "18px", border: "1px solid rgba(255,255,255,0.08)" }}>
 
       {/* -- Breadcrumb -- */}
       <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "rgba(255,255,255,0.30)" }}>
@@ -222,6 +262,13 @@ export default function AdminCertificatesPage() {
         </div>
         <div style={{ display: "flex", gap: "10px", flexShrink: 0 }}>
           <button
+            onClick={handleIssueMissingCertificates}
+            disabled={issuing}
+            style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 18px", height: "40px", background: "rgba(16,185,129,0.18)", border: "1px solid rgba(16,185,129,0.38)", borderRadius: "10px", color: "#6EE7B7", fontSize: "13px", fontWeight: 700, cursor: issuing ? "not-allowed" : "pointer", opacity: issuing ? 0.75 : 1, transition: "all .15s" }}
+          >
+            {issuing ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <CheckCircle size={14} />} Issue Certificates
+          </button>
+          <button
             onClick={handleExportCSV}
             style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 18px", height: "40px", background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", color: "rgba(255,255,255,0.65)", fontSize: "13px", fontWeight: 600, cursor: "pointer", transition: "all .15s" }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.30)"; (e.currentTarget as HTMLButtonElement).style.color = "#fff"; }}
@@ -230,7 +277,11 @@ export default function AdminCertificatesPage() {
             <Download size={14} /> Export CSV
           </button>
           <button
-            onClick={() => toast.success("Data refreshed!")}
+            onClick={() => {
+              loadCertificates()
+                .then(() => toast.success("Data refreshed!"))
+                .catch(() => toast.error("Failed to refresh certificates"));
+            }}
             style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 18px", height: "40px", background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", color: "rgba(255,255,255,0.65)", fontSize: "13px", fontWeight: 600, cursor: "pointer", transition: "all .15s" }}
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.30)"; (e.currentTarget as HTMLButtonElement).style.color = "#fff"; }}
             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.12)"; (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.65)"; }}
@@ -390,8 +441,8 @@ export default function AdminCertificatesPage() {
                             {c.student[0]}
                           </div>
                           <div>
-                            <p style={{ color: "#fff", fontWeight: 600, fontSize: "14px", margin: "0 0 2px" }}>{c.student}</p>
-                            <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "12px", margin: 0 }}>{c.phone}</p>
+                            <p style={{ color: "#fff", fontWeight: 600, fontSize: "14px", margin: "0 0 2px" }}>{c.student ?? "Unknown Student"}</p>
+                            <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "12px", margin: 0 }}>{c.phone ?? "-"}</p>
                           </div>
                         </div>
                       </td>

@@ -109,7 +109,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         flexDirection: "column",
       }}>
         <div style={{ width: "240px", height: "100%" }}>
-          <SidebarContent pathname={pathname} onNavClick={() => setSidebarOpen(false)} onLogout={handleLogout} adminName={adminName} />
+          <SidebarContent
+            pathname={pathname}
+            onNavClick={() => {
+              if (window.matchMedia("(max-width: 768px)").matches) {
+                setSidebarOpen(false);
+              }
+            }}
+            onLogout={handleLogout}
+            adminName={adminName}
+          />
         </div>
       </div>
 

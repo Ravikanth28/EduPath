@@ -81,6 +81,8 @@ export interface Certificate {
   accent: string;
   accentDim: string;
   accentBorder: string;
+  student?: string;
+  phone?: string;
 }
 
 export interface LeaderboardEntry {
@@ -192,6 +194,25 @@ export interface ActivityEntry {
 
 export interface PlatformSettings {
   student_dashboard_enabled: boolean;
+}
+
+export interface CourseEnrollmentItem {
+  student_id: string;
+  student_name: string;
+  email: string;
+  progress: number;
+  completed_modules: number;
+  total_modules: number;
+  status: "assigned" | "in_progress" | "completed";
+  enrolled_at: string | null;
+  last_activity_at: string | null;
+}
+
+export interface CourseEnrollmentsResponse {
+  course_id: string;
+  course_title: string;
+  enrolled_count: number;
+  items: CourseEnrollmentItem[];
 }
 
 // ─── API client ───────────────────────────────────────────────────────────────
@@ -329,6 +350,17 @@ export const api = {
         method: "PUT",
         body: JSON.stringify({ enabled }),
       }),
+    courseEnrollments: (courseId: string) => request<CourseEnrollmentsResponse>(`/admin/courses/${courseId}/enrollments`),
+    assignStudentsToCourse: (courseId: string, studentIds: string[]) =>
+      request<{ message: string; assigned_count: number; skipped_count: number; invalid_count: number; enrolled_count: number }>(
+        `/admin/courses/${courseId}/assign`,
+        { method: "POST", body: JSON.stringify({ student_ids: studentIds }) }
+      ),
+    issueMissingCertificates: () =>
+      request<{ message: string; completed_count: number; issued_count: number; already_had_count: number }>(
+        "/admin/certificates/issue-missing",
+        { method: "POST" }
+      ),
   },
   platform: {
     settings: () => request<PlatformSettings>("/platform-settings"),

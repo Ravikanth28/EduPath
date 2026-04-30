@@ -336,6 +336,11 @@ class StudentDashboardVisibilityRequest(BaseModel):
     enabled: bool
 
 
+class AssignStudentsRequest(BaseModel):
+
+    student_ids: list[str]
+
+
 
 
 
@@ -1085,6 +1090,129 @@ def enroll_course(
     return {"message": "Enrolled successfully"}
 
 
+@app.get("/admin/courses/{course_id}/enrollments")
+def admin_course_enrollments(
+    course_id: str,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(404, "Course not found")
+
+    enrollments = (
+        db.query(Enrollment)
+        .filter(Enrollment.course_id == course_id)
+        .order_by(Enrollment.enrolled_at.desc())
+        .all()
+    )
+
+    result = []
+    for enroll in enrollments:
+        student = db.query(User).filter(
+            User.id == enroll.user_id,
+            User.role == "student",
+        ).first()
+        if not student:
+            continue
+
+        progress = int(enroll.progress or 0)
+        if progress >= 100:
+            status_label = "completed"
+        elif progress > 0:
+            status_label = "in_progress"
+        else:
+            status_label = "assigned"
+
+        completed_modules = round((progress / 100) * (course.modules_count or 0))
+        last_watch = (
+            db.query(ModuleVideoProgress)
+            .filter(
+                ModuleVideoProgress.user_id == student.id,
+                ModuleVideoProgress.course_id == course_id,
+            )
+            .order_by(ModuleVideoProgress.watched_at.desc())
+            .first()
+        )
+        last_activity = last_watch.watched_at if last_watch else enroll.enrolled_at
+
+        result.append({
+            "student_id": student.id,
+            "student_name": student.name,
+            "email": student.email,
+            "progress": progress,
+            "completed_modules": completed_modules,
+            "total_modules": course.modules_count or 0,
+            "status": status_label,
+            "enrolled_at": enroll.enrolled_at.isoformat() if enroll.enrolled_at else None,
+            "last_activity_at": last_activity.isoformat() if last_activity else None,
+        })
+
+    return {
+        "course_id": course.id,
+        "course_title": course.title,
+        "enrolled_count": len(result),
+        "items": result,
+    }
+
+
+@app.post("/admin/courses/{course_id}/assign")
+def admin_assign_students_to_course(
+    course_id: str,
+    data: AssignStudentsRequest,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(404, "Course not found")
+
+    unique_ids = list({sid for sid in data.student_ids if sid})
+    if not unique_ids:
+        raise HTTPException(400, "No students selected")
+
+    students = db.query(User).filter(
+        User.id.in_(unique_ids),
+        User.role == "student",
+    ).all()
+    valid_ids = {s.id for s in students}
+
+    assigned_count = 0
+    skipped_count = 0
+    for student in students:
+        existing = db.query(Enrollment).filter(
+            Enrollment.user_id == student.id,
+            Enrollment.course_id == course_id,
+        ).first()
+        if existing:
+            skipped_count += 1
+            continue
+
+        db.add(Enrollment(
+            id=str(uuid.uuid4()),
+            user_id=student.id,
+            course_id=course_id,
+            progress=0,
+        ))
+        db.add(ActivityLog(
+            student_name=student.name,
+            detail=f"Assigned to {course.title} by admin",
+        ))
+        assigned_count += 1
+
+    course.students_count = db.query(Enrollment).filter(Enrollment.course_id == course_id).count() + assigned_count
+    db.commit()
+
+    invalid_count = len(unique_ids) - len(valid_ids)
+    return {
+        "message": "Students assigned",
+        "assigned_count": assigned_count,
+        "skipped_count": skipped_count,
+        "invalid_count": invalid_count,
+        "enrolled_count": course.students_count,
+    }
+
+
 
 
 
@@ -1520,46 +1648,105 @@ def get_leaderboard(current_user: User = Depends(get_current_user), db: Session 
 
 # -----------------------------------------------------
 
+def _issue_missing_certificates(db: Session, student_id: str | None = None) -> dict:
+    query = (
+        db.query(Enrollment, Course, User)
+        .join(Course, Enrollment.course_id == Course.id)
+        .join(User, Enrollment.user_id == User.id)
+        .filter(User.role == "student", Enrollment.progress == 100)
+    )
+    if student_id:
+        query = query.filter(Enrollment.user_id == student_id)
+
+    completed_rows = query.all()
+    issued_count = 0
+    skipped_count = 0
+
+    for _, course, student in completed_rows:
+        exists = db.query(Certificate).filter(
+            Certificate.student_id == student.id,
+            Certificate.course_name == course.title,
+        ).first()
+        if exists:
+            skipped_count += 1
+            continue
+
+        db.add(Certificate(
+            id=f"CERT-{uuid.uuid4().hex[:8].upper()}",
+            course_name=course.title,
+            category=course.category,
+            student_id=student.id,
+            issued_date=datetime.utcnow().strftime("%B %d, %Y"),
+            status="verified",
+            grad=course.grad,
+            accent=course.accent,
+            accent_dim="rgba(124,58,237,0.12)",
+            accent_border="rgba(124,58,237,0.3)",
+        ))
+        db.add(ActivityLog(
+            student_name=student.name,
+            detail=f"Certificate issued for {course.title}",
+        ))
+        issued_count += 1
+
+    if issued_count:
+        db.commit()
+
+    return {
+        "completed_count": len(completed_rows),
+        "issued_count": issued_count,
+        "already_had_count": skipped_count,
+    }
+
+
+@app.post("/admin/certificates/issue-missing")
+def admin_issue_missing_certificates(
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    result = _issue_missing_certificates(db)
+    return {
+        "message": "Missing certificates processed",
+        **result,
+    }
+
 @app.get("/certificates")
 
 def list_certificates(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
 
     if current_user.role != "admin":
 
-        # Auto-generate any missing certificates for completed enrollments
-        completed = (
-            db.query(Enrollment, Course)
-            .join(Course, Enrollment.course_id == Course.id)
-            .filter(Enrollment.user_id == current_user.id, Enrollment.progress == 100)
-            .all()
-        )
-        for enroll, course in completed:
-            exists = db.query(Certificate).filter(
-                Certificate.student_id == current_user.id,
-                Certificate.course_name == course.title,
-            ).first()
-            if not exists:
-                db.add(Certificate(
-                    id=f"CERT-{uuid.uuid4().hex[:8].upper()}",
-                    course_name=course.title,
-                    category=course.category,
-                    student_id=current_user.id,
-                    issued_date=datetime.utcnow().strftime("%B %d, %Y"),
-                    status="verified",
-                    grad=course.grad,
-                    accent=course.accent,
-                    accent_dim="rgba(124,58,237,0.12)",
-                    accent_border="rgba(124,58,237,0.3)",
-                ))
-        db.commit()
+        _issue_missing_certificates(db, student_id=current_user.id)
 
     if current_user.role == "admin":
 
-        certs = db.query(Certificate).all()
+        certs = (
+            db.query(Certificate, User)
+            .outerjoin(User, Certificate.student_id == User.id)
+            .all()
+        )
 
     else:
 
         certs = db.query(Certificate).filter(Certificate.student_id == current_user.id).all()
+
+    if current_user.role == "admin":
+        return [
+            {
+                "id": c.id,
+                "course": c.course_name,
+                "category": c.category,
+                "issued": c.issued_date,
+                "status": c.status,
+                "grad": c.grad,
+                "accent": c.accent,
+                "accentDim": c.accent_dim,
+                "accentBorder": c.accent_border,
+                "student": u.name if u else "Unknown Student",
+                "phone": u.phone if u else "-",
+            }
+            for c, u in certs
+        ]
 
     return [
 
