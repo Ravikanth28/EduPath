@@ -1,29 +1,26 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Search, Users, BookOpen, Award, GraduationCap, UserPlus,
-  ChevronUp, ChevronDown, X, ExternalLink, Calendar, Filter,
+  ChevronUp, ChevronDown, X, ExternalLink, Calendar, Filter, Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { api, type Student as ApiStudent, type Course, type CourseEnrollmentsResponse } from "@/lib/api";
 
-// --- Mock data ----------------------------------------------------------------
-const COURSES_LIST = ["Engineering Mathematics", "Physics Mechanics", "Chemistry Fundamentals", "Computer Science Basics", "Electronics & Circuits"];
-
-const INITIAL_STUDENTS = [
-  { id: "1",  name: "Arjun Sharma",   phone: "9876543210", email: "arjun@example.com",  courseName: "Engineering Mathematics", courseStatus: "In progress - 4/6 mod", progress: 72,  certs: 1, joined: "Mar 10, 2026", status: "active",      enrolled: true  },
-  { id: "2",  name: "Priya Nair",     phone: "9876543211", email: "priya@example.com",  courseName: "Physics Mechanics",        courseStatus: "Completed",             progress: 100, certs: 2, joined: "Feb 28, 2026", status: "active",      enrolled: true  },
-  { id: "3",  name: "Rahul Mehta",    phone: "9876543212", email: "rahul@example.com",  courseName: "Chemistry Fundamentals",  courseStatus: "In progress - 2/8 mod", progress: 35,  certs: 0, joined: "Apr 5, 2026",  status: "inactive",    enrolled: true  },
-  { id: "4",  name: "Sneha Patel",    phone: "9876543213", email: "sneha@example.com",  courseName: null,                      courseStatus: null,                    progress: 0,   certs: 0, joined: "Apr 20, 2026", status: "not_started", enrolled: false },
-  { id: "5",  name: "Deepa Krishnan", phone: "9876543214", email: "deepa@example.com",  courseName: "Computer Science Basics", courseStatus: "In progress - 3/7 mod", progress: 58,  certs: 0, joined: "Mar 22, 2026", status: "active",      enrolled: true  },
-  { id: "6",  name: "Karan Verma",    phone: "9876543215", email: "karan@example.com",   courseName: "Engineering Mathematics", courseStatus: "In progress - 1/6 mod", progress: 18,  certs: 0, joined: "Apr 24, 2026", status: "active",      enrolled: true  },
-  { id: "7",  name: "Anita Roy",      phone: "9876543216", email: "anita@example.com",   courseName: null,                      courseStatus: null,                    progress: 0,   certs: 0, joined: "Apr 23, 2026", status: "not_started", enrolled: false },
-  { id: "8",  name: "Vikram Singh",   phone: "9876543217", email: "vikram@example.com",  courseName: "Electronics & Circuits",  courseStatus: "In progress - 2/4 mod", progress: 45,  certs: 0, joined: "Apr 15, 2026", status: "active",      enrolled: true  },
-  { id: "9",  name: "Meera Iyer",     phone: "9876543218", email: "meera@example.com",   courseName: "Physics Mechanics",       courseStatus: "In progress - 3/5 mod", progress: 60,  certs: 1, joined: "Mar 18, 2026", status: "active",      enrolled: true  },
-  { id: "10", name: "Ravi Kumar",     phone: "9876543219", email: "ravi@example.com",    courseName: null,                      courseStatus: null,                    progress: 0,   certs: 0, joined: "Apr 28, 2026", status: "not_started", enrolled: false },
-];
-
-type Student = typeof INITIAL_STUDENTS[0];
+type Student = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  courseName: string | null;
+  courseStatus: string | null;
+  progress: number;
+  certs: number;
+  joined: string;
+  status: "active" | "not_started" | "inactive";
+  enrolled: boolean;
+};
 type SortKey = "name" | "progress" | "joined";
 
 const AVATAR_COLORS = [
@@ -34,10 +31,14 @@ const AVATAR_COLORS = [
   "#2F45D8",
   "#2F45D8",
 ];
-const avatarColor = (id: string) => AVATAR_COLORS[parseInt(id) % AVATAR_COLORS.length];
+const avatarColor = (id: string) => {
+  const hash = id.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+};
 
 export default function AdminStudentsPage() {
-  const [students, setStudents]       = useState(INITIAL_STUDENTS);
+  const [students, setStudents]       = useState<Student[]>([]);
+  const [courses, setCourses]         = useState<Course[]>([]);
   const [search, setSearch]           = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy]           = useState<SortKey>("joined");
@@ -53,6 +54,70 @@ export default function AdminStudentsPage() {
   const [showRegister, setShowRegister] = useState(false);
   const [regForm, setRegForm]           = useState({ name: "", email: "", phone: "", password: "" });
   const [regErrors, setRegErrors]       = useState<Record<string, string>>({});
+  const [deletingId, setDeletingId]     = useState<string | null>(null);
+  const [selectedIds, setSelectedIds]   = useState<string[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const loadData = async () => {
+    const [studentRows, courseRows] = await Promise.all([
+      api.students.list(),
+      api.courses.adminList().catch(() => [] as Course[]),
+    ]);
+    const enrollmentRows = await Promise.all(
+      courseRows.map(c => api.admin.courseEnrollments(c.id).catch(() => ({
+        course_id: c.id,
+        course_title: c.title,
+        enrolled_count: 0,
+        items: [],
+      } as CourseEnrollmentsResponse)))
+    );
+
+    const progressByStudent = new Map<string, { progress: number; courseTitle: string; completedModules: number; totalModules: number }>();
+    for (const courseEnrollments of enrollmentRows) {
+      for (const item of courseEnrollments.items) {
+        const existing = progressByStudent.get(item.student_id);
+        if (!existing || item.progress > existing.progress) {
+          progressByStudent.set(item.student_id, {
+            progress: item.progress,
+            courseTitle: courseEnrollments.course_title,
+            completedModules: item.completed_modules,
+            totalModules: item.total_modules,
+          });
+        }
+      }
+    }
+
+    const mapped = studentRows.map((s: ApiStudent) => {
+      const enrolledCount = s.enrolled_courses.length;
+      const live = progressByStudent.get(s.id);
+      const progress = live?.progress ?? 0;
+      return {
+        id: s.id,
+        name: s.name,
+        phone: s.phone,
+        email: s.email,
+        courseName: enrolledCount > 0 ? (live?.courseTitle ?? "Assigned Course") : null,
+        courseStatus: enrolledCount > 0
+          ? (progress >= 100
+            ? "Completed"
+            : `In progress - ${live ? `${live.completedModules}/${live.totalModules} modules` : `${progress}%`}`)
+          : null,
+        progress,
+        certs: s.certificates.length,
+        joined: s.joined,
+        status: enrolledCount > 0 ? "active" : "not_started",
+        enrolled: enrolledCount > 0,
+      } as Student;
+    });
+    setCourses(courseRows);
+    setStudents(mapped);
+  };
+
+  useEffect(() => {
+    loadData().catch(() => {
+      toast.error("Failed to load students");
+    });
+  }, []);
 
   // -- Sorting + filtering ----------------------------------------------------
   const handleSort = (key: SortKey) => {
@@ -88,6 +153,9 @@ export default function AdminStudentsPage() {
       return sortDir === "asc" ? val : -val;
     }), [students, search, fCourse, fCert, fEnroll, fStatus, sortBy, sortDir]);
 
+  const visibleIds = filtered.map(s => s.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
+
   // -- In-view stats ----------------------------------------------------------
   const statEnrolled = filtered.filter(s => s.enrolled).length;
   const statCerts    = filtered.filter(s => s.certs > 0).length;
@@ -106,26 +174,75 @@ export default function AdminStudentsPage() {
     return e;
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     const errs = validateReg();
     if (Object.keys(errs).length) { setRegErrors(errs); return; }
-    setStudents(prev => [{
-      id: String(prev.length + 1),
-      name: regForm.name.trim(), phone: regForm.phone.trim(), email: regForm.email.trim(),
-      courseName: null, courseStatus: null, progress: 0, certs: 0,
-      joined: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-      status: "not_started", enrolled: false,
-    }, ...prev]);
-    toast.success("Student registered!");
-    setShowRegister(false);
-    setRegForm({ name: "", email: "", phone: "", password: "" });
-    setRegErrors({});
+    try {
+      await api.auth.register({
+        name: regForm.name.trim(),
+        email: regForm.email.trim(),
+        phone: regForm.phone.trim(),
+        password: regForm.password,
+      });
+      await loadData();
+      toast.success("Student registered!");
+      setShowRegister(false);
+      setRegForm({ name: "", email: "", phone: "", password: "" });
+      setRegErrors({});
+    } catch {
+      toast.error("Failed to register student");
+    }
   };
 
   const closeReg = () => {
     setShowRegister(false);
     setRegForm({ name: "", email: "", phone: "", password: "" });
     setRegErrors({});
+  };
+
+  const handleDeleteStudent = async (student: Student) => {
+    const ok = window.confirm(`Delete ${student.name}? This will permanently remove the student and related records.`);
+    if (!ok) return;
+    setDeletingId(student.id);
+    try {
+      await api.students.delete(student.id);
+      setStudents(prev => prev.filter(s => s.id !== student.id));
+      toast.success("Student deleted");
+    } catch {
+      toast.error("Failed to delete student");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAllVisible = () => {
+    if (allVisibleSelected) {
+      setSelectedIds(prev => prev.filter(id => !visibleIds.includes(id)));
+      return;
+    }
+    setSelectedIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    const ok = window.confirm(`Delete ${selectedIds.length} selected student(s)? This will permanently remove their records from the database.`);
+    if (!ok) return;
+
+    setBulkDeleting(true);
+    try {
+      const res = await api.students.bulkDelete(selectedIds);
+      setStudents(prev => prev.filter(s => !selectedIds.includes(s.id)));
+      setSelectedIds([]);
+      toast.success(`Deleted ${res.deleted_count} student(s)`);
+    } catch {
+      toast.error("Failed to bulk delete students");
+    } finally {
+      setBulkDeleting(false);
+    }
   };
 
   // -- Stat cards -------------------------------------------------------------
@@ -158,12 +275,23 @@ export default function AdminStudentsPage() {
           <h1 style={{ color: "#111322", fontWeight: 800, fontSize: "28px", margin: "0 0 4px" }}>Students</h1>
           <p style={{ color: "rgba(17,19,34,0.45)", fontSize: "14px", margin: 0 }}>{students.length} registered users</p>
         </div>
-        <button
-          onClick={() => setShowRegister(true)}
-          style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 20px", height: "44px", background: "linear-gradient(135deg,#2F45D8,#2336B8)", color: "#FFFFFF", border: "none", borderRadius: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer", flexShrink: 0 }}
-        >
-          <UserPlus size={16} /> Register User
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {selectedIds.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 16px", height: "44px", background: bulkDeleting ? "rgba(185,28,28,0.5)" : "#B91C1C", color: "#FFFFFF", border: "none", borderRadius: "12px", fontSize: "14px", fontWeight: 700, cursor: bulkDeleting ? "not-allowed" : "pointer", flexShrink: 0 }}
+            >
+              Delete Selected ({selectedIds.length})
+            </button>
+          )}
+          <button
+            onClick={() => setShowRegister(true)}
+            style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "0 20px", height: "44px", background: "linear-gradient(135deg,#2F45D8,#2336B8)", color: "#FFFFFF", border: "none", borderRadius: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer", flexShrink: 0 }}
+          >
+            <UserPlus size={16} /> Register User
+          </button>
+        </div>
       </div>
 
       {/* Stat cards */}
@@ -206,7 +334,7 @@ export default function AdminStudentsPage() {
         <div style={{ background: "rgba(17,19,34,0.02)", border: "1px solid rgba(17,19,34,0.08)", borderRadius: "14px", padding: "20px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "16px" }}>
             {([
-              { label: "COURSE",      value: fCourse, setter: setFCourse, options: ["All Courses", ...COURSES_LIST] },
+              { label: "COURSE",      value: fCourse, setter: setFCourse, options: ["All Courses", ...Array.from(new Set(courses.map(c => c.title)))] },
               { label: "CERTIFICATE", value: fCert,   setter: setFCert,   options: ["All", "Has Certificate", "No Certificate"] },
               { label: "ENROLLMENT",  value: fEnroll, setter: setFEnroll, options: ["All", "Enrolled", "Not Enrolled"] },
               { label: "STATUS",      value: fStatus, setter: setFStatus, options: ["All Statuses", "Active", "Inactive", "Not Started"] },
@@ -232,19 +360,27 @@ export default function AdminStudentsPage() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid rgba(17,19,34,0.07)" }}>
+                <th style={{ width: "42px", textAlign: "center", padding: "11px 8px" }}>
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleSelectAllVisible}
+                    aria-label="Select all visible students"
+                  />
+                </th>
                 <TH label="Student"  field="name" />
                 <TH label="Contact" />
                 <TH label="Courses" />
                 <TH label="Progress" field="progress" />
                 <TH label="Certs" />
                 <TH label="Joined"   field="joined" />
-                <th style={{ width: "44px" }} />
+                <th style={{ width: "92px" }} />
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: "48px 16px", textAlign: "center", color: "rgba(17,19,34,0.3)", fontSize: "14px" }}>
+                  <td colSpan={8} style={{ padding: "48px 16px", textAlign: "center", color: "rgba(17,19,34,0.3)", fontSize: "14px" }}>
                     No students match your search.
                   </td>
                 </tr>
@@ -255,10 +391,19 @@ export default function AdminStudentsPage() {
                   onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = "rgba(17,19,34,0.025)"}
                   onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = "transparent"}
                 >
+                  <td style={{ padding: "14px 8px", textAlign: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(s.id)}
+                      onChange={() => toggleSelect(s.id)}
+                      aria-label={`Select ${s.name}`}
+                    />
+                  </td>
+
                   {/* Student */}
                   <td style={{ padding: "14px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                      <div style={{ width: "38px", height: "38px", borderRadius: "50%", background: ["#2F45D8", "#6F82FF", "#2F45D8", "#8EA0FF", "#2F45D8"][parseInt(s.id) % 5], display: "flex", alignItems: "center", justifyContent: "center", color: "#FFFFFF", fontWeight: 800, fontSize: "14px", flexShrink: 0 }}>
+                      <div style={{ width: "38px", height: "38px", borderRadius: "50%", background: avatarColor(s.id), display: "flex", alignItems: "center", justifyContent: "center", color: "#FFFFFF", fontWeight: 800, fontSize: "14px", flexShrink: 0 }}>
                         {s.name[0]}
                       </div>
                       <div>
@@ -322,16 +467,26 @@ export default function AdminStudentsPage() {
                     </div>
                   </td>
 
-                  {/* Link */}
+                  {/* Actions */}
                   <td style={{ padding: "14px 12px", textAlign: "center" }}>
-                    <Link
-                      href={`/admin/students/${s.id}`}
-                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "30px", height: "30px", borderRadius: "8px", color: "rgba(17,19,34,0.3)", border: "1px solid rgba(17,19,34,0.08)", textDecoration: "none", transition: "all .15s" }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#2F45D8"; (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(47,69,216,0.4)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(47,69,216,0.1)"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(17,19,34,0.3)"; (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(17,19,34,0.08)"; (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; }}
-                    >
-                      <ExternalLink size={13} />
-                    </Link>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                      <Link
+                        href={`/admin/students/${s.id}`}
+                        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "30px", height: "30px", borderRadius: "8px", color: "rgba(17,19,34,0.3)", border: "1px solid rgba(17,19,34,0.08)", textDecoration: "none", transition: "all .15s" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#2F45D8"; (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(47,69,216,0.4)"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(47,69,216,0.1)"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(17,19,34,0.3)"; (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(17,19,34,0.08)"; (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; }}
+                      >
+                        <ExternalLink size={13} />
+                      </Link>
+                      <button
+                        onClick={() => handleDeleteStudent(s)}
+                        disabled={deletingId === s.id}
+                        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "30px", height: "30px", borderRadius: "8px", color: deletingId === s.id ? "rgba(185,28,28,0.35)" : "rgba(185,28,28,0.75)", border: "1px solid rgba(185,28,28,0.25)", background: deletingId === s.id ? "rgba(185,28,28,0.05)" : "transparent", cursor: deletingId === s.id ? "not-allowed" : "pointer", transition: "all .15s" }}
+                        title="Delete student"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

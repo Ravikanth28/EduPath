@@ -196,6 +196,14 @@ export interface PlatformSettings {
   student_dashboard_enabled: boolean;
 }
 
+export interface CertificateVerification {
+  id: string;
+  status: "verified" | "pending" | "revoked";
+  student_name: string;
+  course_name: string;
+  issued_date: string;
+}
+
 export interface CourseEnrollmentItem {
   student_id: string;
   student_name: string;
@@ -287,7 +295,7 @@ export const api = {
     getQuestions: (courseId: string, moduleNum: number) =>
       request<QuizQuestion[]>(`/courses/${courseId}/modules/${moduleNum}/questions`),
     markVideoWatched: (courseId: string, moduleNum: number, videoIdx: number) =>
-      request<{ watched: boolean; module_unlocked_for_test: boolean }>(
+      request<{ watched: boolean; module_unlocked_for_test: boolean; progress: number }>(
         `/courses/${courseId}/modules/${moduleNum}/videos/${videoIdx}/watch`,
         { method: "POST" }
       ),
@@ -321,6 +329,12 @@ export const api = {
   students: {
     list: () => request<Student[]>("/students"),
     get: (id: string) => request<Student>(`/students/${id}`),
+    delete: (id: string) => request<{ message: string }>(`/students/${id}`, { method: "DELETE" }),
+    bulkDelete: (studentIds: string[]) =>
+      request<{ message: string; deleted_count: number; not_found_count: number }>("/students/bulk-delete", {
+        method: "POST",
+        body: JSON.stringify({ student_ids: studentIds }),
+      }),
   },
 
   /** Leaderboard */
@@ -331,6 +345,7 @@ export const api = {
   /** Certificates */
   certificates: {
     list: () => request<Certificate[]>("/certificates"),
+    verify: (code: string) => request<CertificateVerification>(`/certificates/verify/${encodeURIComponent(code)}`),
   },
 
   /** Activity (admin) */

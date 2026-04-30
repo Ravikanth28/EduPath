@@ -42,7 +42,7 @@ from database import (
 
     ActivityLog, Certificate, Course, Enrollment,
 
-    User, get_db, init_db,
+    User, get_db, init_db, SessionLocal,
 
     CourseModule, ModuleVideo, ModuleVideoProgress, ModuleQuestion,
     PlatformSetting,
@@ -87,6 +87,11 @@ app.add_middleware(
 def startup() -> None:
 
     init_db()
+    db = SessionLocal()
+    try:
+        _backfill_enrollment_progress(db)
+    finally:
+        db.close()
 
 
 def module_settings_payload(module: CourseModule) -> dict:
@@ -136,6 +141,41 @@ def is_student_dashboard_enabled(db: Session) -> bool:
     if not setting:
         return True
     return str(setting.value).strip().lower() == "true"
+
+
+def _video_progress_percent(db: Session, user_id: str, course_id: str) -> int:
+    total_videos = db.query(ModuleVideo).filter(ModuleVideo.course_id == course_id).count()
+    if total_videos <= 0:
+        return 0
+    watched_count = db.query(ModuleVideoProgress).filter(
+        ModuleVideoProgress.user_id == user_id,
+        ModuleVideoProgress.course_id == course_id,
+    ).count()
+    return round((watched_count / total_videos) * 100)
+
+
+def _effective_enrollment_progress(db: Session, enrollment: Enrollment) -> int:
+    base_progress = int(enrollment.progress or 0)
+    video_progress = _video_progress_percent(db, enrollment.user_id, enrollment.course_id)
+    return max(base_progress, video_progress)
+
+
+def _recalculate_enrollment_progress(db: Session, enrollment: Enrollment) -> int:
+    effective = _effective_enrollment_progress(db, enrollment)
+    enrollment.progress = effective
+    return effective
+
+
+def _backfill_enrollment_progress(db: Session) -> None:
+    enrollments = db.query(Enrollment).all()
+    changed = False
+    for enrollment in enrollments:
+        before = int(enrollment.progress or 0)
+        after = _recalculate_enrollment_progress(db, enrollment)
+        if before != after:
+            changed = True
+    if changed:
+        db.commit()
 
 
 def set_student_dashboard_enabled(db: Session, enabled: bool) -> None:
@@ -722,6 +762,9 @@ def list_courses(current_user: User = Depends(get_current_user), db: Session = D
             Enrollment.course_id == c.id,
 
         ).first()
+        progress = 0
+        if enroll:
+            progress = _effective_enrollment_progress(db, enroll)
 
         result.append({
 
@@ -735,9 +778,9 @@ def list_courses(current_user: User = Depends(get_current_user), db: Session = D
 
             "enrolled": enroll is not None,
 
-            "progress": enroll.progress if enroll else 0,
+            "progress": progress,
 
-            "completed": enroll.progress == 100 if enroll else False,
+            "completed": progress == 100 if enroll else False,
 
         })
 
@@ -772,6 +815,9 @@ def get_course(
         Enrollment.course_id == course.id,
 
     ).first()
+    progress = 0
+    if enroll:
+        progress = _effective_enrollment_progress(db, enroll)
 
     return {
 
@@ -785,9 +831,9 @@ def get_course(
 
         "enrolled": enroll is not None,
 
-        "progress": enroll.progress if enroll else 0,
+        "progress": progress,
 
-        "completed": enroll.progress == 100 if enroll else False,
+        "completed": progress == 100 if enroll else False,
 
     }
 
@@ -1116,7 +1162,7 @@ def admin_course_enrollments(
         if not student:
             continue
 
-        progress = int(enroll.progress or 0)
+        progress = _recalculate_enrollment_progress(db, enroll)
         if progress >= 100:
             status_label = "completed"
         elif progress > 0:
@@ -1147,6 +1193,8 @@ def admin_course_enrollments(
             "enrolled_at": enroll.enrolled_at.isoformat() if enroll.enrolled_at else None,
             "last_activity_at": last_activity.isoformat() if last_activity else None,
         })
+
+    db.commit()
 
     return {
         "course_id": course.id,
@@ -1251,6 +1299,86 @@ def get_student(
         raise HTTPException(404, "Student not found")
 
     return _user_to_dict(user, db)
+
+
+class BulkDeleteStudentsRequest(BaseModel):
+    student_ids: list[str]
+
+
+@app.post("/students/bulk-delete")
+def bulk_delete_students(
+    data: BulkDeleteStudentsRequest,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    ids = list({sid for sid in data.student_ids if sid})
+    if not ids:
+        raise HTTPException(400, "No student ids provided")
+
+    students = db.query(User).filter(User.id.in_(ids), User.role == "student").all()
+    found_ids = {s.id for s in students}
+    not_found_count = len(ids) - len(found_ids)
+
+    impacted_course_ids = [
+        e.course_id
+        for e in db.query(Enrollment).filter(Enrollment.user_id.in_(found_ids)).all()
+    ]
+
+    for student in students:
+        db.delete(student)
+
+    db.commit()
+
+    for course_id in set(impacted_course_ids):
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            continue
+        course.students_count = db.query(Enrollment).filter(Enrollment.course_id == course_id).count()
+    db.commit()
+
+    db.add(ActivityLog(
+        student_name="Admin",
+        detail=f"Bulk deleted {len(students)} student account(s)",
+    ))
+    db.commit()
+
+    return {
+        "message": "Bulk delete completed",
+        "deleted_count": len(students),
+        "not_found_count": not_found_count,
+    }
+
+
+@app.delete("/students/{student_id}")
+def delete_student(
+    student_id: str,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == student_id, User.role == "student").first()
+    if not user:
+        raise HTTPException(404, "Student not found")
+
+    impacted_course_ids = [
+        e.course_id
+        for e in db.query(Enrollment).filter(Enrollment.user_id == user.id).all()
+    ]
+    student_name = user.name
+    db.delete(user)
+    db.add(ActivityLog(
+        student_name=student_name,
+        detail="Student account deleted by admin",
+    ))
+    db.commit()
+
+    for course_id in set(impacted_course_ids):
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            continue
+        course.students_count = db.query(Enrollment).filter(Enrollment.course_id == course_id).count()
+    db.commit()
+
+    return {"message": "Student deleted"}
 
 
 
@@ -1465,8 +1593,33 @@ def mark_module_video_watched(
             module_num=module_num,
             video_idx=video_idx,
         ))
-        db.commit()
-    return {"watched": True, "module_unlocked_for_test": has_watched_all_module_videos(db, current_user.id, course_id, module_num)}
+
+    enroll = db.query(Enrollment).filter(
+        Enrollment.user_id == current_user.id,
+        Enrollment.course_id == course_id,
+    ).first()
+    if not enroll:
+        enroll = Enrollment(
+            id=str(uuid.uuid4()),
+            user_id=current_user.id,
+            course_id=course_id,
+            progress=0,
+        )
+        db.add(enroll)
+
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if course:
+            course.students_count = db.query(Enrollment).filter(Enrollment.course_id == course_id).count() + 1
+        db.add(ActivityLog(student_name=current_user.name, detail=f"Enrolled in {course.title if course else 'course'}"))
+
+    progress = _recalculate_enrollment_progress(db, enroll)
+    db.commit()
+
+    return {
+        "watched": True,
+        "module_unlocked_for_test": has_watched_all_module_videos(db, current_user.id, course_id, module_num),
+        "progress": progress,
+    }
 
 
 @app.get("/courses/{course_id}/modules/{module_num}/questions")
@@ -1708,6 +1861,22 @@ def admin_issue_missing_certificates(
     return {
         "message": "Missing certificates processed",
         **result,
+    }
+
+
+@app.get("/certificates/verify/{code}")
+def verify_certificate(code: str, db: Session = Depends(get_db)):
+    cert = db.query(Certificate).filter(Certificate.id == code).first()
+    if not cert:
+        raise HTTPException(404, "Certificate not found")
+
+    student = db.query(User).filter(User.id == cert.student_id).first()
+    return {
+        "id": cert.id,
+        "status": cert.status,
+        "student_name": student.name if student else "Unknown Student",
+        "course_name": cert.course_name,
+        "issued_date": cert.issued_date,
     }
 
 @app.get("/certificates")

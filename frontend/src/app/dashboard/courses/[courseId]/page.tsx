@@ -97,7 +97,11 @@ export default function CoursePage() {
         ? { ...mod, videos: mod.videos.map((video, idx) => idx === listIdx ? { ...video, watched: true } : video) }
         : mod
     )));
-    api.modules.markVideoWatched(courseId, moduleNum, videoIdx).catch(() => {});
+    api.modules.markVideoWatched(courseId, moduleNum, videoIdx)
+      .then((res) => {
+        setCourse(prev => prev ? { ...prev, enrolled: true, progress: Math.max(prev.progress ?? 0, res.progress), completed: (Math.max(prev.progress ?? 0, res.progress) >= 100) } : prev);
+      })
+      .catch(() => {});
   };
 
   // Called by VideoPlayer when the video finishes

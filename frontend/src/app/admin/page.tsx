@@ -3,19 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { BookOpen, Users, Award, Layers, Plus, UserCheck, Clock, TrendingUp, LayoutDashboard } from "lucide-react";
-import { api, type AdminStats, type ActivityEntry, type LeaderboardEntry, type Student } from "../../lib/api";
-
-const enrollData = [
-  { name: "Eng. Maths", students: 420 }, { name: "Physics", students: 380 },
-  { name: "Chemistry", students: 290 }, { name: "CS", students: 340 }, { name: "Electronics", students: 190 },
-];
-const categoryData = [
-  { name: "Mathematics", value: 30, color: "#2F45D8" },
-  { name: "Physics", value: 25, color: "#E4E9FF" },
-  { name: "Chemistry", value: 20, color: "#111322" },
-  { name: "Computer Sci.", value: 15, color: "#2F45D8" },
-  { name: "Other", value: 10, color: "#2336B8" },
-];
+import { api, type AdminStats, type ActivityEntry, type LeaderboardEntry, type Student, type Course } from "../../lib/api";
 
 const RANK_STYLE: Record<number, string> = {
   1: "bg-yellow-500/20 text-yellow-400",
@@ -35,6 +23,7 @@ export default function AdminDashboard() {
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [leaders, setLeaders]   = useState<LeaderboardEntry[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [courses, setCourses]   = useState<Course[]>([]);
   const [studentDashboardEnabled, setStudentDashboardEnabled] = useState(true);
   const [savingDashboardSetting, setSavingDashboardSetting] = useState(false);
   const [dashboardSettingError, setDashboardSettingError] = useState("");
@@ -46,8 +35,28 @@ export default function AdminDashboard() {
     api.students.list().then(s =>
       setStudents([...s].sort((a, b) => new Date(b.joined).getTime() - new Date(a.joined).getTime()).slice(0, 4))
     ).catch(() => {});
+    api.courses.adminList().then(setCourses).catch(() => setCourses([]));
     api.admin.platformSettings().then(s => setStudentDashboardEnabled(Boolean(s.student_dashboard_enabled))).catch(() => {});
   }, []);
+
+  const enrollData = courses
+    .slice()
+    .sort((a, b) => (b.students ?? 0) - (a.students ?? 0))
+    .slice(0, 6)
+    .map(c => ({ name: c.title.length > 14 ? `${c.title.slice(0, 14)}...` : c.title, students: c.students ?? 0 }));
+
+  const categoryPalette = ["#2F45D8", "#E4E9FF", "#111322", "#2336B8", "#6B78C8", "#A7B1E8"];
+  const categoryCounts = courses.reduce<Record<string, number>>((acc, course) => {
+    const key = course.category || "Other";
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+  const totalCategoryCourses = Object.values(categoryCounts).reduce((sum, val) => sum + val, 0);
+  const categoryData = Object.entries(categoryCounts).map(([name, count], idx) => ({
+    name,
+    value: totalCategoryCourses > 0 ? Math.round((count / totalCategoryCourses) * 100) : 0,
+    color: categoryPalette[idx % categoryPalette.length],
+  }));
 
   const handleStudentDashboardToggle = async () => {
     setSavingDashboardSetting(true);

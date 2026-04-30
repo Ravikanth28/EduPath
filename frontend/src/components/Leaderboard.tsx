@@ -1,26 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Trophy, ChevronLeft, ChevronRight, Zap, Gift, Crown, Medal } from "lucide-react";
+import { api, type LeaderboardEntry } from "@/lib/api";
 
-interface LeaderboardEntry {
+interface DisplayEntry {
   rank: number;
   name: string;
   points: number;
   isCurrentUser?: boolean;
 }
-
-const MOCK_ENTRIES: LeaderboardEntry[] = [
-  { rank: 1, name: "Arjun Sharma", points: 1240 },
-  { rank: 2, name: "Priya Nair", points: 1080 },
-  { rank: 3, name: "Rahul Mehta", points: 960 },
-  { rank: 4, name: "Sneha Patel", points: 820 },
-  { rank: 5, name: "Vikram Singh", points: 750 },
-  { rank: 6, name: "Anita Roy", points: 630 },
-  { rank: 7, name: "Karan Verma", points: 580 },
-  { rank: 8, name: "Deepa Krishnan", points: 510 },
-  { rank: 9, name: "Amit Gupta", points: 440 },
-  { rank: 10, name: "You", points: 385, isCurrentUser: true },
-];
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -32,6 +20,23 @@ export function Leaderboard({ showMyRank = false }: LeaderboardProps) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
+  const [entries, setEntries] = useState<DisplayEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    api.leaderboard.get()
+      .then((data: LeaderboardEntry[]) => {
+        setEntries(data.map(e => ({
+          rank: e.rank,
+          name: e.name,
+          points: e.points,
+          isCurrentUser: e.is_current_user,
+        })));
+      })
+      .catch(() => setEntries([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
   const daysLeft = isCurrentMonth ? new Date(year, month + 1, 0).getDate() - now.getDate() : 0;
@@ -45,9 +50,9 @@ export function Leaderboard({ showMyRank = false }: LeaderboardProps) {
     else setMonth(m => m + 1);
   };
 
-  const top3 = MOCK_ENTRIES.slice(0, 3);
-  const rest = MOCK_ENTRIES.slice(3);
-  const currentUser = MOCK_ENTRIES.find(e => e.isCurrentUser);
+  const top3 = entries.slice(0, 3);
+  const rest = entries.slice(3);
+  const currentUser = entries.find(e => e.isCurrentUser);
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4">
@@ -76,7 +81,16 @@ export function Leaderboard({ showMyRank = false }: LeaderboardProps) {
         </div>
       </div>
 
+      {loading && (
+        <div className="glass-card p-6 text-center text-white/60 text-sm">Loading leaderboard...</div>
+      )}
+
+      {!loading && entries.length === 0 && (
+        <div className="glass-card p-6 text-center text-white/60 text-sm">No leaderboard data available.</div>
+      )}
+
       {/* Top 3 podium */}
+      {!loading && entries.length > 0 && (
       <div className="glass-card p-6">
         <div className="flex items-end justify-center gap-4">
           {/* Rank 2 */}
@@ -127,9 +141,10 @@ export function Leaderboard({ showMyRank = false }: LeaderboardProps) {
           </div>
         </div>
       </div>
+      )}
 
       {/* Rest of the list */}
-      <div className="glass-card overflow-hidden">
+      {!loading && rest.length > 0 && <div className="glass-card overflow-hidden">
         {rest.map((entry) => (
           <div
             key={entry.rank}
@@ -154,7 +169,7 @@ export function Leaderboard({ showMyRank = false }: LeaderboardProps) {
             </div>
           </div>
         ))}
-      </div>
+      </div>}
 
       {/* My rank footer */}
       {showMyRank && currentUser && currentUser.rank > 3 && (

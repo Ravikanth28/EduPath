@@ -2,26 +2,25 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { GraduationCap, CheckCircle, XCircle, Clock, AlertCircle, User, BookOpen, Calendar, Hash, Loader2, ExternalLink } from "lucide-react";
+import { api, type CertificateVerification } from "@/lib/api";
 
 type Status = "loading" | "verified" | "pending" | "revoked" | "not_found";
 
-const MOCK: Record<string, { status: Status; name: string; course: string; issued: string; id: string; reason?: string }> = {
-  "CERT-DEMO-001": { status: "verified", name: "Arjun Sharma", course: "Physics Mechanics", issued: "March 15, 2026", id: "CERT-DEMO-001" },
-  "CERT-DEMO-002": { status: "pending", name: "Priya Nair", course: "Engineering Mathematics", issued: "April 1, 2026", id: "CERT-DEMO-002" },
-  "CERT-DEMO-003": { status: "revoked", name: "John Doe", course: "Chemistry Fundamentals", issued: "January 20, 2026", id: "CERT-DEMO-003", reason: "Academic misconduct" },
-};
-
 export default function VerifyPage({ params }: { params: { code: string } }) {
   const [status, setStatus] = useState<Status>("loading");
-  const [data, setData] = useState<typeof MOCK[string] | null>(null);
+  const [data, setData] = useState<(CertificateVerification & { reason?: string }) | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const found = MOCK[params.code];
-      if (found) { setData(found); setStatus(found.status); }
-      else setStatus("not_found");
-    }, 1500);
-    return () => clearTimeout(timer);
+    setStatus("loading");
+    setData(null);
+    api.certificates.verify(params.code)
+      .then((found) => {
+        setData(found);
+        setStatus(found.status);
+      })
+      .catch(() => {
+        setStatus("not_found");
+      });
   }, [params.code]);
 
   return (
@@ -77,21 +76,21 @@ export default function VerifyPage({ params }: { params: { code: string } }) {
                 <User size={16} className="text-white/40 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-xs text-white/40 uppercase tracking-wider">Student Name</p>
-                  <p className="text-white font-semibold">{data.name}</p>
+                  <p className="text-white font-semibold">{data.student_name}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <BookOpen size={16} className="text-white/40 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-xs text-white/40 uppercase tracking-wider">Course Completed</p>
-                  <p className="text-white">{data.course}</p>
+                  <p className="text-white">{data.course_name}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <Calendar size={16} className="text-white/40 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-xs text-white/40 uppercase tracking-wider">Issued Date</p>
-                  <p className="text-white">{data.issued}</p>
+                  <p className="text-white">{data.issued_date}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">

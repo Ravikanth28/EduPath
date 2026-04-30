@@ -7,27 +7,16 @@ import {
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 
-const COURSES_LIST = [
-  "Engineering Mathematics",
-  "Physics Mechanics",
-  "Chemistry Fundamentals",
-  "Computer Science Basics",
-  "Electronics & Circuits",
-];
-
-const STUDENTS_LIST = [
-  "Arjun Sharma", "Priya Nair", "Meera Iyer",
-];
-
-const CERTS = [
-  { id: "CERT-2026-001", student: "Arjun Sharma",  phone: "9876543210", course: "Engineering Mathematics", category: "Mathematics", issued: "Apr 20, 2026", status: "verified"  },
-  { id: "CERT-2026-002", student: "Priya Nair",    phone: "9876543211", course: "Physics Mechanics",       category: "Physics",     issued: "Apr 15, 2026", status: "pending"   },
-  { id: "CERT-2026-003", student: "Meera Iyer",    phone: "9876543218", course: "Physics Mechanics",       category: "Physics",     issued: "Mar 18, 2026", status: "verified"  },
-  { id: "CERT-2026-004", student: "Arjun Sharma",  phone: "9876543210", course: "Computer Science Basics", category: "CS",          issued: "Mar 5, 2026",  status: "revoked", revokeReason: "Academic dishonesty" },
-  { id: "CERT-2026-005", student: "Priya Nair",    phone: "9876543211", course: "Chemistry Fundamentals",  category: "Chemistry",   issued: "Feb 28, 2026", status: "pending"   },
-];
-
-type Cert = typeof CERTS[0] & { revokeReason?: string };
+type Cert = {
+  id: string;
+  student?: string;
+  phone?: string;
+  course: string;
+  category: string;
+  issued: string;
+  status: "verified" | "pending" | "revoked";
+  revokeReason?: string;
+};
 type SortField = "issued" | "student" | "course";
 
 const STATUS_META: Record<string, { label: string; bg: string; color: string; border: string }> = {
@@ -37,7 +26,7 @@ const STATUS_META: Record<string, { label: string; bg: string; color: string; bo
 };
 
 export default function AdminCertificatesPage() {
-  const [certs, setCerts]             = useState<Cert[]>(CERTS);
+  const [certs, setCerts]             = useState<Cert[]>([]);
   const [search, setSearch]           = useState("");
   const [showFilters, setShowFilters] = useState(true);
   const [sortField, setSortField]     = useState<SortField>("issued");
@@ -118,7 +107,7 @@ export default function AdminCertificatesPage() {
   const toggleAll     = () => setSelected(selected.length === filtered.length ? [] : filtered.map(c => c.id));
 
   // -- Actions ----------------------------------------------------------------
-  const updateCerts = (ids: string[], status: string, reason?: string) => {
+  const updateCerts = (ids: string[], status: Cert["status"], reason?: string) => {
     setCerts(prev => prev.map(c => ids.includes(c.id)
       ? { ...c, status, revokeReason: status === "revoked" ? reason : undefined }
       : c
@@ -343,8 +332,18 @@ export default function AdminCertificatesPage() {
         <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "20px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
             {([
-              { label: "STUDENT", value: fStudent, setter: setFStudent, options: ["All Students", ...STUDENTS_LIST] },
-              { label: "COURSE",  value: fCourse,  setter: setFCourse,  options: ["All Courses",  ...COURSES_LIST]  },
+              {
+                label: "STUDENT",
+                value: fStudent,
+                setter: setFStudent,
+                options: ["All Students", ...Array.from(new Set(certs.map(c => c.student ?? "Unknown Student")))],
+              },
+              {
+                label: "COURSE",
+                value: fCourse,
+                setter: setFCourse,
+                options: ["All Courses", ...Array.from(new Set(certs.map(c => c.course)))],
+              },
               { label: "STATUS",  value: fStatus,  setter: setFStatus,  options: ["All Statuses", "Verified", "Pending Review", "Revoked"] },
             ] as const).map(({ label, value, setter, options }) => (
               <div key={label}>
@@ -438,7 +437,7 @@ export default function AdminCertificatesPage() {
                       <td style={{ padding: "14px 16px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "11px" }}>
                           <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: ["#2F45D8", "#6F82FF", "#2F45D8"][parseInt(c.id.slice(-1)) % 3], display: "flex", alignItems: "center", justifyContent: "center", color: "#FFFFFF", fontWeight: 800, fontSize: "13px", flexShrink: 0 }}>
-                            {c.student[0]}
+                            {(c.student ?? "U")[0]}
                           </div>
                           <div>
                             <p style={{ color: "#fff", fontWeight: 600, fontSize: "14px", margin: "0 0 2px" }}>{c.student ?? "Unknown Student"}</p>

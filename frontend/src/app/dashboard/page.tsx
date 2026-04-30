@@ -3,35 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { PlayCircle, BookOpen, Award, CheckCircle, TrendingUp, Clock, Star } from "lucide-react";
-import { api, type Course } from "@/lib/api";
-
-const testScores = [
-  { name: "M1", score: 85 }, { name: "M2", score: 92 }, { name: "M3", score: 78 },
-  { name: "M4", score: 95 }, { name: "M5", score: 88 },
-];
-
-const RECENT_ACTIVITY = [
-  { icon: PlayCircle,  color: "#A78BFA", bg: "rgba(167,139,250,0.12)", label: "Watched: Introduction to Calculus - Limits", time: "2 hours ago" },
-  { icon: CheckCircle, color: "#4ADE80", bg: "rgba(74,222,128,0.12)",  label: "Passed: Module 3 Test - 92%",               time: "5 hours ago" },
-  { icon: Award,       color: "#FBBF24", bg: "rgba(251,191,36,0.12)",  label: "Certificate Earned: Physics Mechanics",      time: "Yesterday"   },
-  { icon: BookOpen,    color: "#22D3EE", bg: "rgba(34,211,238,0.12)",  label: "Enrolled: Engineering Mathematics",          time: "2 days ago"  },
-];
-
-const COURSES = [
-  { id: "1", title: "Engineering Mathematics", category: "Mathematics", progress: 65,  modules: 6, status: "in_progress" },
-  { id: "2", title: "Physics Mechanics",       category: "Physics",     progress: 100, modules: 5, status: "completed"   },
-];
-
-const CERTS = [
-  { title: "Physics Mechanics", issued: "March 15, 2026", id: "CERT-DEMO-001" },
-];
-
-const STATS = [
-  { icon: BookOpen,    label: "Enrolled Courses",    value: "4",  accent: "#A78BFA", bg: "rgba(167,139,250,0.12)" },
-  { icon: CheckCircle, label: "Completed Modules",   value: "14", accent: "#4ADE80", bg: "rgba(74,222,128,0.12)"  },
-  { icon: TrendingUp,  label: "Finished Courses",    value: "1",  accent: "#22D3EE", bg: "rgba(34,211,238,0.12)"  },
-  { icon: Award,       label: "Certificates Earned", value: "1",  accent: "#FBBF24", bg: "rgba(251,191,36,0.12)"  },
-];
+import { api, type Course, type Certificate, type DashboardStats } from "@/lib/api";
 
 const card: React.CSSProperties = {
   background: "rgba(255,255,255,0.03)",
@@ -46,13 +18,32 @@ const cardHover: React.CSSProperties = {
 
 export default function StudentDashboard() {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const dashboardCourses = courses.length > 0 ? courses.slice(0, 2) : COURSES;
+  const dashboardCourses = courses.slice(0, 2);
   const continueCourse = courses.find(c => c.enrolled && !c.completed) ?? courses[0];
+  const chartData = courses.slice(0, 6).map((c, i) => ({ name: `C${i + 1}`, score: c.progress ?? 0 }));
+  const averageScore = chartData.length ? Math.round(chartData.reduce((sum, c) => sum + c.score, 0) / chartData.length) : 0;
+  const videosWatchedPct = stats && stats.enrolled_courses > 0
+    ? Math.min(100, Math.round((stats.completed_modules / Math.max(stats.enrolled_courses * 6, 1)) * 100))
+    : 0;
+  const testsPassedPct = stats && stats.enrolled_courses > 0
+    ? Math.min(100, Math.round((stats.finished_courses / stats.enrolled_courses) * 100))
+    : 0;
+
+  const statCards = [
+    { icon: BookOpen, label: "Enrolled Courses", value: String(stats?.enrolled_courses ?? 0), accent: "#A78BFA", bg: "rgba(167,139,250,0.12)" },
+    { icon: CheckCircle, label: "Completed Modules", value: String(stats?.completed_modules ?? 0), accent: "#4ADE80", bg: "rgba(74,222,128,0.12)" },
+    { icon: TrendingUp, label: "Finished Courses", value: String(stats?.finished_courses ?? 0), accent: "#22D3EE", bg: "rgba(34,211,238,0.12)" },
+    { icon: Award, label: "Certificates Earned", value: String(stats?.certificates_earned ?? 0), accent: "#FBBF24", bg: "rgba(251,191,36,0.12)" },
+  ];
 
   useEffect(() => {
     api.courses.list().then(setCourses).catch(() => setCourses([]));
+    api.certificates.list().then(setCertificates).catch(() => setCertificates([]));
+    api.dashboard.stats().then(setStats).catch(() => setStats(null));
   }, []);
 
   return (
@@ -69,7 +60,9 @@ export default function StudentDashboard() {
             <h1 style={{ fontSize: "clamp(22px,3vw,32px)", fontWeight: 800, color: "#FFFFFF", margin: "0 0 8px", letterSpacing: "-0.5px" }}>
               Welcome back, <span style={{ color: "#DDE4FF" }}>Student</span>
             </h1>
-            <p style={{ color: "rgba(255,255,255,0.76)", fontSize: "14px" }}>You have 2 courses in progress. Keep going!</p>
+            <p style={{ color: "rgba(255,255,255,0.76)", fontSize: "14px" }}>
+              You have {courses.filter(c => c.enrolled && !c.completed).length} courses in progress. Keep going!
+            </p>
           </div>
 
           {/* Progress ring */}
@@ -78,10 +71,10 @@ export default function StudentDashboard() {
               <svg viewBox="0 0 88 88" style={{ width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
                 <circle cx="44" cy="44" r="36" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="7" />
                 <circle cx="44" cy="44" r="36" fill="none" strokeWidth="7" strokeLinecap="round"
-                  stroke="#FFFFFF" strokeDasharray={`${62 * 2.262} ${(100-62)*2.262}`} />
+                  stroke="#FFFFFF" strokeDasharray={`${(continueCourse?.progress ?? 0) * 2.262} ${(100-(continueCourse?.progress ?? 0))*2.262}`} />
               </svg>
               <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontSize: "17px", fontWeight: 800, color: "#FFFFFF" }}>62%</span>
+                <span style={{ fontSize: "17px", fontWeight: 800, color: "#FFFFFF" }}>{continueCourse?.progress ?? 0}%</span>
               </div>
             </div>
             <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.68)", marginTop: "6px", textAlign: "center" }}>Overall Progress</p>
@@ -96,18 +89,18 @@ export default function StudentDashboard() {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>Continue Learning</p>
-          <p style={{ color: "#fff", fontWeight: 700, fontSize: "15px", marginBottom: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Engineering Mathematics</p>
-          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)" }}>Module 4 of 6</p>
+          <p style={{ color: "#fff", fontWeight: 700, fontSize: "15px", marginBottom: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{continueCourse?.title ?? "No active course"}</p>
+          <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)" }}>{continueCourse ? `${continueCourse.progress ?? 0}% completed` : "Enroll in a course to begin"}</p>
         </div>
         <Link href={continueCourse ? `/dashboard/courses/${continueCourse.id}` : "/dashboard/courses"} className="dash-resume-button" style={{ flexShrink: 0, padding: "10px 20px", background: "linear-gradient(135deg,#7C3AED,#5B21B6)", color: "#FFFFFF", borderRadius: "10px", fontSize: "13px", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", gap: "7px" }}>
           <PlayCircle size={14} /> Resume
         </Link>
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(135deg,#7C3AED,#A78BFA)", width: "65%" }} />
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(135deg,#7C3AED,#A78BFA)", width: `${continueCourse?.progress ?? 0}%` }} />
       </div>
 
       {/* -- Stats row ------------------------------------------ */}
       <div className="dash-stats-grid">
-        {STATS.map(({ icon: Icon, label, value, accent, bg }) => (
+        {statCards.map(({ icon: Icon, label, value, accent, bg }) => (
           <div className="dash-stat-card" key={label} style={{ ...card, padding: "20px", display: "flex", alignItems: "center", gap: "14px" }}>
             <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Icon size={20} color={accent} />
@@ -124,9 +117,9 @@ export default function StudentDashboard() {
       <div className="dash-two-col">
         {/* Bar chart */}
         <div style={{ ...card, padding: "22px" }}>
-          <p style={{ fontWeight: 700, color: "#fff", fontSize: "14px", marginBottom: "18px" }}>Test Scores by Module</p>
+          <p style={{ fontWeight: 700, color: "#fff", fontSize: "14px", marginBottom: "18px" }}>Course Progress</p>
           <ResponsiveContainer width="100%" height={170}>
-            <BarChart data={testScores} margin={{ top: 0, right: 4, bottom: 0, left: -20 }}>
+            <BarChart data={chartData} margin={{ top: 0, right: 4, bottom: 0, left: -20 }}>
               <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 12 }} axisLine={false} tickLine={false} domain={[0,100]} />
               <Tooltip
@@ -146,10 +139,10 @@ export default function StudentDashboard() {
               <svg viewBox="0 0 80 80" style={{ width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
                 <circle cx="40" cy="40" r="30" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
                 <circle cx="40" cy="40" r="30" fill="none" stroke="#7C3AED" strokeWidth="8" strokeLinecap="round"
-                  strokeDasharray={`${88*1.885} ${(100-88)*1.885}`} />
+                  strokeDasharray={`${averageScore*1.885} ${(100-averageScore)*1.885}`} />
               </svg>
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontSize: "16px", fontWeight: 800, color: "#fff" }}>88%</span>
+                <span style={{ fontSize: "16px", fontWeight: 800, color: "#fff" }}>{averageScore}%</span>
               </div>
             </div>
             <div>
@@ -157,7 +150,7 @@ export default function StudentDashboard() {
               <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>Across all modules</p>
             </div>
           </div>
-          {[{ label: "Videos Watched", val: 78, color: "#A78BFA" }, { label: "Tests Passed", val: 92, color: "#4ADE80" }].map(({ label, val, color }) => (
+          {[{ label: "Videos Watched", val: videosWatchedPct, color: "#A78BFA" }, { label: "Tests Passed", val: testsPassedPct, color: "#4ADE80" }].map(({ label, val, color }) => (
             <div key={label} style={{ marginBottom: "12px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "rgba(255,255,255,0.45)", marginBottom: "6px" }}>
                 <span>{label}</span><span style={{ fontWeight: 700, color }}>{val}%</span>
@@ -209,20 +202,20 @@ export default function StudentDashboard() {
       </div>
 
       {/* -- Certificates --------------------------------------- */}
-      {CERTS.length > 0 && (
+      {certificates.length > 0 && (
         <div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
             <h2 style={{ fontWeight: 800, color: "#fff", fontSize: "17px", margin: 0 }}>Certificates</h2>
             <Link href="/dashboard/certificates" style={{ fontSize: "13px", color: "#A78BFA", textDecoration: "none", fontWeight: 600 }}>View All &gt;</Link>
           </div>
           <div style={{ display: "flex", gap: "14px", overflowX: "auto", paddingBottom: "4px" }}>
-            {CERTS.map(c => (
+            {certificates.map(c => (
               <div key={c.id} style={{ ...card, padding: "20px", minWidth: "240px", border: "1px solid rgba(124,58,237,0.25)", background: "rgba(124,58,237,0.08)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
                   <Star size={15} color="#FBBF24" />
                   <span style={{ fontSize: "11px", fontWeight: 700, color: "#FBBF24", background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.25)", borderRadius: "20px", padding: "2px 10px" }}>Earned</span>
                 </div>
-                <p style={{ fontWeight: 700, color: "#fff", fontSize: "15px", marginBottom: "4px" }}>{c.title}</p>
+                <p style={{ fontWeight: 700, color: "#fff", fontSize: "15px", marginBottom: "4px" }}>{c.course}</p>
                 <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "4px" }}>{c.issued}</p>
                 <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>#{c.id.slice(-7)}</p>
               </div>
@@ -230,29 +223,6 @@ export default function StudentDashboard() {
           </div>
         </div>
       )}
-
-      {/* -- Recent Activity ------------------------------------ */}
-      <div>
-        <h2 style={{ fontWeight: 800, color: "#fff", fontSize: "17px", margin: "0 0 16px" }}>Recent Activity</h2>
-        <div style={{ ...card, padding: "8px 0" }}>
-          {RECENT_ACTIVITY.map((item, i) => {
-            const Icon = item.icon;
-            return (
-              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "14px", padding: "14px 20px", borderBottom: i < RECENT_ACTIVITY.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <Icon size={16} color={item.color} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.80)", marginBottom: "4px", lineHeight: 1.4 }}>{item.label}</p>
-                  <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.30)", display: "flex", alignItems: "center", gap: "4px" }}>
-                    <Clock size={11} /> {item.time}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
     </div>
   );

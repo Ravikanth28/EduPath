@@ -1,12 +1,14 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Search, BookOpen, CheckCircle, Clock, Users, PlayCircle, LayoutGrid, Video, HelpCircle, Plus } from "lucide-react";
 import { api, type Course } from "@/lib/api";
 
 type Tab = "all" | "in_progress" | "completed";
 
 export default function CoursesPage() {
+  const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -29,6 +31,16 @@ export default function CoursesPage() {
     all: courses.length,
     in_progress: courses.filter(c => c.enrolled && !c.completed).length,
     completed: courses.filter(c => c.completed).length,
+  };
+
+  const handleEnroll = async (courseId: string) => {
+    try {
+      await api.courses.enroll(courseId);
+      setCourses(prev => prev.map(c => c.id === courseId ? { ...c, enrolled: true, progress: 0, completed: false } : c));
+      router.push(`/dashboard/courses/${courseId}`);
+    } catch {
+      // keep UI stable when enroll request fails
+    }
   };
 
   const TAB_CONFIG: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -154,28 +166,40 @@ export default function CoursesPage() {
 
                 {/* Action button */}
                 <div style={{ marginTop: "auto" }}>
-                  <Link
-                    href={`/dashboard/courses/${c.id}`}
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-                      width: "100%", padding: "13px", borderRadius: "12px", fontSize: "14px",
-                      fontWeight: 700, textDecoration: "none", cursor: "pointer", boxSizing: "border-box",
-                      background: c.enrolled && !c.completed
-                        ? "linear-gradient(135deg,#3B82F6 0%,#6366F1 100%)"
-                        : c.completed
+                  {!c.enrolled ? (
+                    <button
+                      onClick={() => handleEnroll(c.id)}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                        width: "100%", padding: "13px", borderRadius: "12px", fontSize: "14px",
+                        fontWeight: 700, cursor: "pointer", boxSizing: "border-box",
+                        background: "linear-gradient(135deg,#7C3AED 0%,#06B6D4 100%)",
+                        color: "#fff", border: "none", boxShadow: "0 4px 20px rgba(124,58,237,0.35)",
+                      }}
+                    >
+                      <Plus size={15} /> Enroll Now
+                    </button>
+                  ) : (
+                    <Link
+                      href={`/dashboard/courses/${c.id}`}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                        width: "100%", padding: "13px", borderRadius: "12px", fontSize: "14px",
+                        fontWeight: 700, textDecoration: "none", cursor: "pointer", boxSizing: "border-box",
+                        background: c.completed
                           ? "transparent"
-                          : "linear-gradient(135deg,#7C3AED 0%,#06B6D4 100%)",
-                      color: c.completed ? "rgba(255,255,255,0.7)" : "#fff",
-                      border: c.completed ? "1px solid rgba(255,255,255,0.18)" : "none",
-                      boxShadow: c.completed ? "none" : "0 4px 20px rgba(124,58,237,0.35)",
-                    }}
-                    onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.opacity = "0.87"}
-                    onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.opacity = "1"}
-                  >
-                    {!c.enrolled && <><Plus size={15} /> Enroll Now</>}
-                    {c.enrolled && !c.completed && <><PlayCircle size={15} /> Continue</>}
-                    {c.completed && <><CheckCircle size={15} /> Review Course</>}
-                  </Link>
+                          : "linear-gradient(135deg,#3B82F6 0%,#6366F1 100%)",
+                        color: c.completed ? "rgba(255,255,255,0.7)" : "#fff",
+                        border: c.completed ? "1px solid rgba(255,255,255,0.18)" : "none",
+                        boxShadow: c.completed ? "none" : "0 4px 20px rgba(124,58,237,0.35)",
+                      }}
+                      onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.opacity = "0.87"}
+                      onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.opacity = "1"}
+                    >
+                      {!c.completed && <><PlayCircle size={15} /> Continue</>}
+                      {c.completed && <><CheckCircle size={15} /> Review Course</>}
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>
