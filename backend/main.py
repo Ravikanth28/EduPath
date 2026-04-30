@@ -45,6 +45,7 @@ from database import (
     User, get_db, init_db,
 
     CourseModule, ModuleVideo, ModuleVideoProgress, ModuleQuestion,
+    PlatformSetting,
     DEFAULT_PASS_PERCENTAGE, DEFAULT_QUESTIONS_PER_TEST,
     DEFAULT_SHUFFLE_QUESTIONS, DEFAULT_SHOW_EXPLANATIONS,
 
@@ -126,6 +127,26 @@ def is_module_completed(db: Session, user_id: str, course: Course, module_num: i
         return False
     completed_count = round(((enroll.progress or 0) / 100) * course.modules_count)
     return module_num <= completed_count
+
+
+def is_student_dashboard_enabled(db: Session) -> bool:
+    setting = db.query(PlatformSetting).filter(
+        PlatformSetting.key == "student_dashboard_enabled",
+    ).first()
+    if not setting:
+        return True
+    return str(setting.value).strip().lower() == "true"
+
+
+def set_student_dashboard_enabled(db: Session, enabled: bool) -> None:
+    setting = db.query(PlatformSetting).filter(
+        PlatformSetting.key == "student_dashboard_enabled",
+    ).first()
+    value = "true" if enabled else "false"
+    if setting:
+        setting.value = value
+    else:
+        db.add(PlatformSetting(key="student_dashboard_enabled", value=value))
 
 
 
@@ -308,6 +329,11 @@ class PasswordChangeRequest(BaseModel):
     current_password: str
 
     new_password: str
+
+
+class StudentDashboardVisibilityRequest(BaseModel):
+
+    enabled: bool
 
 
 
@@ -1591,6 +1617,10 @@ def get_activity(_: User = Depends(require_admin), db: Session = Depends(get_db)
 
 def dashboard_stats(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
 
+    if current_user.role == "student" and not is_student_dashboard_enabled(db):
+
+        raise HTTPException(403, "Student dashboard is currently disabled")
+
     enrollments = db.query(Enrollment).filter(Enrollment.user_id == current_user.id).all()
 
     completed   = [e for e in enrollments if e.progress == 100]
@@ -1636,6 +1666,55 @@ def admin_stats(_: User = Depends(require_admin), db: Session = Depends(get_db))
         "total_certificates": db.query(Certificate).count(),
 
         "active_students":    db.query(User).filter(User.role == "student", User.verified == True).count(),
+
+    }
+
+
+@app.get("/admin/platform-settings")
+
+def admin_platform_settings(_: User = Depends(require_admin), db: Session = Depends(get_db)):
+
+    return {
+
+        "student_dashboard_enabled": is_student_dashboard_enabled(db),
+
+    }
+
+
+@app.put("/admin/platform-settings/student-dashboard")
+
+def admin_set_student_dashboard_visibility(
+
+    data: StudentDashboardVisibilityRequest,
+
+    _: User = Depends(require_admin),
+
+    db: Session = Depends(get_db),
+
+):
+
+    set_student_dashboard_enabled(db, bool(data.enabled))
+
+    db.commit()
+
+    return {
+
+        "message": "Student dashboard visibility updated",
+
+        "student_dashboard_enabled": is_student_dashboard_enabled(db),
+
+    }
+
+
+@app.get("/platform-settings")
+
+def platform_settings(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+
+    _ = current_user
+
+    return {
+
+        "student_dashboard_enabled": is_student_dashboard_enabled(db),
 
     }
 

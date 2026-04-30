@@ -193,10 +193,18 @@ class ModuleQuestion(Base):
     explanation = Column(Text)
 
 
+class PlatformSetting(Base):
+    __tablename__ = "platform_settings"
+
+    key = Column(String(100), primary_key=True)
+    value = Column(String(20), nullable=False)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_course_module_settings_columns()
+    _ensure_platform_settings_defaults()
 
 
 def _ensure_course_module_settings_columns() -> None:
@@ -221,6 +229,17 @@ def _ensure_course_module_settings_columns() -> None:
         for name, definition in columns.items():
             if name not in existing:
                 conn.execute(text(f"ALTER TABLE course_modules ADD COLUMN {name} {definition}"))
+
+
+def _ensure_platform_settings_defaults() -> None:
+    with engine.begin() as conn:
+        existing = conn.execute(text(
+            "SELECT `value` FROM platform_settings WHERE `key` = 'student_dashboard_enabled' LIMIT 1"
+        )).first()
+        if existing is None:
+            conn.execute(text(
+                "INSERT INTO platform_settings (`key`, `value`) VALUES ('student_dashboard_enabled', 'true')"
+            ))
 
 
 def get_db():

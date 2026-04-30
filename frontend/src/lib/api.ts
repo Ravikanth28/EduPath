@@ -190,6 +190,10 @@ export interface ActivityEntry {
   time: string;
 }
 
+export interface PlatformSettings {
+  student_dashboard_enabled: boolean;
+}
+
 // ─── API client ───────────────────────────────────────────────────────────────
 export const api = {
   /** Auth */
@@ -319,5 +323,14 @@ export const api = {
   },
   admin: {
     stats: () => request<AdminStats>("/admin/stats"),
+    platformSettings: () => request<PlatformSettings>("/admin/platform-settings"),
+    setStudentDashboardVisibility: (enabled: boolean) =>
+      request<PlatformSettings & { message: string }>("/admin/platform-settings/student-dashboard", {
+        method: "PUT",
+        body: JSON.stringify({ enabled }),
+      }),
+  },
+  platform: {
+    settings: () => request<PlatformSettings>("/platform-settings"),
   },
 };
