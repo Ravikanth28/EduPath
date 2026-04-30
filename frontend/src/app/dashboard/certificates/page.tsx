@@ -250,14 +250,14 @@ function CertificateView({
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        padding: "1.5cqw 2.5cqw 1.3cqw 0.5cqw",
+        padding: "0.8cqw 2.5cqw 0.8cqw 0.5cqw",
       }}>
 
         {/* ① + ②+③ top group — header and certificate title stay close together */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.2cqw" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0" }}>
 
         {/* ① College header */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.38cqw", width: "100%" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.15cqw", width: "100%" }}>
           {/* Name row: logo absolutely placed so it never shifts the text */}
           <div style={{ position: "relative", width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -282,17 +282,30 @@ function CertificateView({
           <span style={{
             fontSize: "1.8cqw", fontWeight: 600, color: "#1a3070",
             letterSpacing: "0.08em", fontFamily: "'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif",
-            textTransform: "uppercase", lineHeight: 1.2, paddingTop: "1cqw", paddingBottom: "3cqw",
+            textTransform: "uppercase", lineHeight: 1.2, paddingTop: "0.2cqw", paddingBottom: "0",
           }}>
             Department of Artificial Intelligence and Data Science
           </span>
+          {/* Logos row */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "2cqw", marginBottom: "0" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/iic_logo.png" alt="IIC" style={{ height: "9cqw", width: "auto", objectFit: "contain", mixBlendMode: "multiply" }} />
+            {/* Divider */}
+            <div style={{ width: "1px", height: "7cqw", background: "linear-gradient(180deg, transparent, #b8820a 30%, #b8820a 70%, transparent)" }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/idsc.png" alt="IDSC" style={{ height: "12cqw", width: "auto", objectFit: "contain", mixBlendMode: "multiply" }} />
+            {/* Divider */}
+            <div style={{ width: "1px", height: "7cqw", background: "linear-gradient(180deg, transparent, #b8820a 30%, #b8820a 70%, transparent)" }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/infinit-aid.png" alt="Infinit-Aid" style={{ height: "6cqw", width: "auto", objectFit: "contain", mixBlendMode: "multiply" }} />
+          </div>
         </div>
 
         {/* ② + ③ Centre block — title and body merged */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5cqw" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.6cqw" }}>
           <div style={{ textAlign: "center" }}>
             <div style={{
-              fontSize: "8.4cqw", fontWeight: 900, color: "#06103a", lineHeight: 0.88, letterSpacing: "0.04em",
+              fontSize: "6.8cqw", fontWeight: 900, color: "#06103a", lineHeight: 0.88, letterSpacing: "0.04em",
               fontFamily: "'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif",
               textShadow: "0 3px 12px rgba(6,16,58,0.18)",
             }}>
@@ -306,20 +319,20 @@ function CertificateView({
               of Appreciation
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.9cqw" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.6cqw" }}>
             <div style={{ fontSize: "1.9cqw", fontStyle: "italic", color: "#7a5c2e", fontFamily: "Georgia, 'Times New Roman', serif", letterSpacing: "0.04em" }}>This is to certify that</div>
-            <div style={{ fontSize: "6.5cqw", fontWeight: 700, color: "#06103a", lineHeight: 0.98, textAlign: "center", fontFamily: "'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif", textShadow: "0 1px 6px rgba(6,16,58,0.13)" }}>
+            <div style={{ fontSize: "5.5cqw", fontWeight: 700, color: "#06103a", lineHeight: 0.98, textAlign: "center", fontFamily: "'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif", textShadow: "0 1px 6px rgba(6,16,58,0.13)" }}>
               {studentName}
             </div>
             <div style={{ fontSize: "1.72cqw", fontStyle: "italic", color: "#7a5c2e", fontFamily: "Georgia, 'Times New Roman', serif", letterSpacing: "0.03em" }}>has successfully completed the course</div>
-            <div style={{ fontSize: "3.6cqw", fontWeight: 700, color: "#06103a", lineHeight: 1.04, textAlign: "center", fontFamily: "'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif", letterSpacing: "0.05em", borderBottom: "1.5px solid #b8820a", paddingBottom: "0.3cqw" }}>
+            <div style={{ fontSize: "2.8cqw", fontWeight: 700, color: "#06103a", lineHeight: 1.04, textAlign: "center", fontFamily: "'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif", letterSpacing: "0.05em", borderBottom: "1.5px solid #b8820a", paddingBottom: "0.2cqw" }}>
               {course}
             </div>
             <div style={{ fontSize: "1.42cqw", fontStyle: "italic", color: "#7a5c2e", textAlign: "center", paddingLeft: "4cqw", fontFamily: "Georgia, 'Times New Roman', serif", lineHeight: 1.5 }}>
              In recognition of outstanding performance, dedication, and successful completion of all course modules and assessments conducted by EduPath Platform
             </div>
             {/* Course Completed badge */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.9cqw", marginTop: "0.4cqw" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.4cqw", marginTop: "0.1cqw" }}>
               <div style={{
                 display: "inline-flex", alignItems: "center", gap: "0.5cqw",
                 background: "#0a1855",
